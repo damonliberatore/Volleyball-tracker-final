@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
@@ -11,20 +11,20 @@ const SetterIcon = () => (
 
 // --- Stat Leader Icons ---
 const AceLeaderIcon = () => (
-    <span className="absolute bottom-1 left-1 bg-green-500 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center z-10">A</span>
+    <span className="absolute bottom-0.5 left-0.5 bg-green-500 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center z-10">A</span>
 );
 const KillLeaderIcon = () => (
-    <span className="absolute bottom-1 right-1 bg-orange-500 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center z-10">K</span>
+    <span className="absolute bottom-0.5 right-0.5 bg-orange-500 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center z-10">K</span>
 );
 const DigLeaderIcon = () => (
-    <span className="absolute top-1 left-1 bg-yellow-500 text-black p-0.5 rounded-full h-5 w-5 flex items-center justify-center z-10" title="Dig Leader">
+    <span className="absolute top-0.5 left-0.5 bg-yellow-500 text-black p-0.5 rounded-full h-5 w-5 flex items-center justify-center z-10" title="Dig Leader">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
             <path d="M14.25 21.75a.75.75 0 01.75-.75h4.5a.75.75 0 010 1.5h-4.5a.75.75 0 01-.75-.75zM16.5 6.31L12.44 2.25a.75.75 0 00-1.06 0L7.5 6.19a.75.75 0 001.06 1.06L11.25 4.5v11.25a.75.75 0 001.5 0V4.5l2.69 2.69a.75.75 0 001.06-1.06z" />
         </svg>
     </span>
 );
 const RELeaderIcon = () => (
-    <span className="absolute top-1/2 -translate-y-1/2 right-1 h-5 w-5 flex items-center justify-center z-10" title="Most Reception Errors">
+    <span className="absolute top-1/2 -translate-y-1/2 right-0.5 h-5 w-5 flex items-center justify-center z-10" title="Most Reception Errors">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="red" strokeWidth="2" className="w-5 h-5">
             <circle cx="12" cy="12" r="10" />
             <circle cx="12" cy="12" r="6" />
@@ -33,40 +33,63 @@ const RELeaderIcon = () => (
     </span>
 );
 const HittingPercentageLeaderIcon = () => (
-    <span className="absolute top-1/2 -translate-y-1/2 left-1 bg-white text-black text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center z-10" title="Highest Hitting %">%</span>
+    <span className="absolute top-1/2 -translate-y-1/2 left-0.5 bg-white text-black text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center z-10" title="Highest Hitting %">%</span>
 );
 
 const ReceivingLeaderIcon = () => (
-    <span className="absolute top-1 left-1/2 -translate-x-1/2 h-5 w-5 flex items-center justify-center z-10" title="Highest Receiving %">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="silver" className="w-4 h-4">
+    <span className="absolute top-0.5 left-1/2 -translate-x-1/2 h-5 w-5 flex items-center justify-center z-10" title="Highest Receiving %">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="silver" className="w-5 h-5">
             <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6a3 3 0 003 3h10.5a3 3 0 003-3v-6a3 3 0 00-3-3v-3A5.25 5.25 0 0012 1.5zm-3.75 5.25a3.75 3.75 0 107.5 0v3h-7.5v-3z" clipRule="evenodd" />
         </svg>
     </span>
 );
 
-
-const PlayerCard = ({ player, isSetter, onClick, isTarget, isSelected, statLeaders = {} }) => (
-    <div
-        onClick={onClick}
-        className={`relative bg-gray-700 text-white p-4 rounded-lg shadow-md text-center cursor-pointer hover:bg-gray-600 transition-colors duration-200 h-24 flex flex-col justify-center ${isTarget ? 'ring-2 ring-cyan-400' : ''} ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
-    >
-        {player ? (
-            <>
-                {statLeaders.dig === player.id && <DigLeaderIcon />}
-                {isSetter && <SetterIcon />}
-                {statLeaders.re === player.id && <RELeaderIcon />}
-                {statLeaders.hitPct === player.id && <HittingPercentageLeaderIcon />}
-                {statLeaders.receivePct === player.id && <ReceivingLeaderIcon />}
-                <span className="text-xl font-bold">#{player.number}</span>
-                <span className="text-sm truncate">{player.name}</span>
-                {statLeaders.ace === player.id && <AceLeaderIcon />}
-                {statLeaders.kill === player.id && <KillLeaderIcon />}
-            </>
-        ) : (
-            <span className="text-gray-400">Empty</span>
-        )}
-    </div>
+const ReceptionLeaderIcon = () => (
+    <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-5 w-5 flex items-center justify-center z-10" title="Most Reception Attempts">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-5 h-5">
+            <path d="M12 2L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-3z" fill="orange" stroke="white" strokeWidth="1.5" />
+        </svg>
+    </span>
 );
+
+
+const PlayerCard = ({ player, isSetter, onClick, isTarget, isSelected, statLeaders = {}, playerSetStats }) => {
+    let nameColorClass = 'text-white';
+    if (player && playerSetStats) {
+        const vbrt = parseFloat(calculateVbrt(playerSetStats));
+        if (vbrt >= 2.0) {
+            nameColorClass = 'text-green-400';
+        } else if (vbrt < -2.0) {
+            nameColorClass = 'text-red-400';
+        } else if (vbrt < -1.0) {
+            nameColorClass = 'text-yellow-400';
+        }
+    }
+
+    return (
+        <div
+            onClick={onClick}
+            className={`relative bg-gray-700 text-white p-2 rounded-lg shadow-md text-center cursor-pointer hover:bg-gray-600 transition-colors duration-200 h-20 flex flex-col justify-center ${isTarget ? 'ring-2 ring-cyan-400' : ''} ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
+        >
+            {player ? (
+                <>
+                    {statLeaders.dig === player.id && <DigLeaderIcon />}
+                    {isSetter && <SetterIcon />}
+                    {statLeaders.re === player.id && <RELeaderIcon />}
+                    {statLeaders.hitPct === player.id && <HittingPercentageLeaderIcon />}
+                    {statLeaders.receivePct === player.id && <ReceivingLeaderIcon />}
+                    <span className={`text-xl font-bold ${nameColorClass}`}>#{player.number}</span>
+                    <span className={`text-sm truncate font-bold ${nameColorClass}`}>{player.name}</span>
+                    {statLeaders.ace === player.id && <AceLeaderIcon />}
+                    {statLeaders.kill === player.id && <KillLeaderIcon />}
+                    {statLeaders.receiveAtt === player.id && <ReceptionLeaderIcon />}
+                </>
+            ) : (
+                <span className="text-gray-400">Empty</span>
+            )}
+        </div>
+    );
+};
 
 const Modal = ({ title, children, isOpen, onClose }) => {
     if (!isOpen) return null;
@@ -82,6 +105,41 @@ const Modal = ({ title, children, isOpen, onClose }) => {
         </div>
     );
 };
+
+// --- Stat Calculation Helpers ---
+const calculateVbrt = (stats) => {
+    if (!stats) return '0.00';
+
+    const aces = stats['Ace'] || 0;
+    const serveErrors = stats['Serve Error'] || 0;
+    const serveAttempts = stats['Serve Attempt'] || 0;
+    const serveRating = serveAttempts > 0 ? (aces - serveErrors) / serveAttempts : 0;
+
+    const kills = stats['Kill'] || 0;
+    const hitErrors = stats['Hit Error'] || 0;
+    const hitAttempts = stats['Hit Attempt'] || 0;
+    const hitPct = hitAttempts > 0 ? (kills - hitErrors) / hitAttempts : 0;
+
+    const blocks = stats['Block'] || 0;
+    const blockErrors = stats['Block Error'] || 0;
+    const blockRating = blocks - blockErrors;
+
+    const digs = stats['Dig'] || 0;
+    const digRating = digs / 10;
+
+    const assists = stats['Assist'] || 0;
+    const setErrors = stats['Set Error'] || 0;
+    const setAttempts = stats['Set Attempt'] || 0;
+    const setRating = setAttempts > 0 ? (assists - setErrors) / setAttempts : 0;
+
+    const receptionScore = stats['Reception Score'] || 0;
+    const receptionAttempts = stats['Reception Attempt'] || 0;
+    const receiveAvg = receptionAttempts > 0 ? receptionScore / receptionAttempts : 0;
+
+    const totalRating = serveRating + hitPct + blockRating + digRating + setRating + receiveAvg;
+    return totalRating.toFixed(2);
+};
+
 
 // --- Main App Component ---
 export default function App() {
@@ -129,32 +187,37 @@ export default function App() {
     const [activeTab, setActiveTab] = useState('set_stats');
     const [setupStep, setSetupStep] = useState('players');
     const [savedMatches, setSavedMatches] = useState([]);
+    const [autoSaveStatus, setAutoSaveStatus] = useState('Saved ✓');
 
     // Firebase state
     const [db, setDb] = useState(null);
     const [auth, setAuth] = useState(null);
     const [userId, setUserId] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
+    const autoSaveTimeoutRef = useRef(null);
+
 
     // --- Stat Leader Calculation ---
     const statLeaders = useMemo(() => {
-        const leaders = { ace: null, kill: null, dig: null, re: null, hitPct: null, receivePct: null };
-        const statsToTrack = { ace: 'Ace', kill: 'Kill', dig: 'Dig', re: 'RE' };
+        const leaders = { ace: null, kill: null, dig: null, re: null, hitPct: null, receivePct: null, receiveAtt: null };
+        const statsToTrack = { ace: 'Ace', kill: 'Kill', dig: 'Dig', re: 'RE', receiveAtt: 'Reception Attempt' };
 
-        const maxStats = { ace: 0, kill: 0, dig: 0, re: 0 };
+        const maxStats = { ace: 0, kill: 0, dig: 0, re: 0, receiveAtt: 0 };
         for (const playerId in setStats) {
             maxStats.ace = Math.max(maxStats.ace, setStats[playerId]?.Ace || 0);
             maxStats.kill = Math.max(maxStats.kill, setStats[playerId]?.Kill || 0);
             maxStats.dig = Math.max(maxStats.dig, setStats[playerId]?.Dig || 0);
             maxStats.re = Math.max(maxStats.re, setStats[playerId]?.RE || 0);
+            maxStats.receiveAtt = Math.max(maxStats.receiveAtt, setStats[playerId]?.['Reception Attempt'] || 0);
         }
 
-        const tiedPlayers = { ace: [], kill: [], dig: [], re: [] };
+        const tiedPlayers = { ace: [], kill: [], dig: [], re: [], receiveAtt: [] };
         for (const playerId in setStats) {
             if ((setStats[playerId]?.Ace || 0) === maxStats.ace && maxStats.ace > 0) tiedPlayers.ace.push(playerId);
             if ((setStats[playerId]?.Kill || 0) === maxStats.kill && maxStats.kill > 0) tiedPlayers.kill.push(playerId);
             if ((setStats[playerId]?.Dig || 0) === maxStats.dig && maxStats.dig > 0) tiedPlayers.dig.push(playerId);
             if ((setStats[playerId]?.RE || 0) === maxStats.re && maxStats.re > 0) tiedPlayers.re.push(playerId);
+            if ((setStats[playerId]?.['Reception Attempt'] || 0) === maxStats.receiveAtt && maxStats.receiveAtt > 0) tiedPlayers.receiveAtt.push(playerId);
         }
 
         for (const key in tiedPlayers) {
@@ -164,13 +227,28 @@ export default function App() {
                 const statName = statsToTrack[key];
                 const reversedLog = [...pointLog].reverse();
                 for (const logEntry of reversedLog) {
-                    const match = logEntry.match(new RegExp(`${statName} by #(\\d+)`));
-                    if (match) {
-                        const playerNumberStr = match[1];
-                        const player = roster.find(p => p.number === playerNumberStr);
-                        if (player && tiedPlayers[key].includes(player.id)) {
-                            leaders[key] = player.id;
-                            break;
+                    const passStatRegex = /^(H|O): (\d-Pass)/;
+                    const isPassStat = passStatRegex.test(logEntry);
+
+                    if (statName === 'Reception Attempt' && isPassStat) {
+                         const match = logEntry.match(/by #(\d+)/);
+                         if (match) {
+                            const playerNumberStr = match[1];
+                            const player = roster.find(p => p.number === playerNumberStr);
+                            if (player && tiedPlayers[key].includes(player.id)) {
+                                leaders[key] = player.id;
+                                break;
+                            }
+                        }
+                    } else if (statName !== 'Reception Attempt' && !isPassStat) {
+                        const match = logEntry.match(new RegExp(`${statName} by #(\\d+)`));
+                        if (match) {
+                            const playerNumberStr = match[1];
+                            const player = roster.find(p => p.number === playerNumberStr);
+                            if (player && tiedPlayers[key].includes(player.id)) {
+                                leaders[key] = player.id;
+                                break;
+                            }
                         }
                     }
                 }
@@ -286,6 +364,42 @@ export default function App() {
         return collection(db, 'artifacts', appId, 'users', userId, 'matches');
     }, [db, userId]);
 
+    const autoSaveMatchToFirebase = useCallback(async () => {
+        if (!getMatchCollectionRef() || !matchId) {
+            return;
+        }
+        setAutoSaveStatus('Saving...');
+        const serializableSubGroups = {};
+        for (const key in subGroups) { serializableSubGroups[key] = Array.from(subGroups[key]); }
+        const matchData = { matchId, matchName, homeTeamName, opponentTeamName, lastSaved: new Date().toISOString(), gameState, matchPhase, roster, lineup, liberos, liberoServingFor, liberoHasServedFor, setterId, bench, pointLog, playerStats, setStats, rotationScores, subGroups: serializableSubGroups };
+        try {
+            await setDoc(doc(getMatchCollectionRef(), matchId), matchData);
+            setAutoSaveStatus('Saved ✓');
+        } catch (error) {
+            console.error("Autosave error:", error);
+            setAutoSaveStatus('Save Error!');
+        }
+    }, [db, userId, matchId, matchName, homeTeamName, opponentTeamName, gameState, matchPhase, roster, lineup, liberos, liberoServingFor, liberoHasServedFor, setterId, bench, pointLog, playerStats, setStats, rotationScores, subGroups]);
+
+    useEffect(() => {
+        if (matchPhase !== 'playing' || !matchId) {
+            return;
+        }
+        if (autoSaveTimeoutRef.current) {
+            clearTimeout(autoSaveTimeoutRef.current);
+        }
+        setAutoSaveStatus('Unsaved changes...');
+        autoSaveTimeoutRef.current = setTimeout(() => {
+            autoSaveMatchToFirebase();
+        }, 3000);
+        return () => {
+            if (autoSaveTimeoutRef.current) {
+                clearTimeout(autoSaveTimeoutRef.current);
+            }
+        };
+    }, [gameState, lineup, setStats, pointLog, bench, subGroups, setterId, liberos, liberoServingFor, liberoHasServedFor, currentServerId, matchPhase, matchId, autoSaveMatchToFirebase]);
+
+
     const calculateSeasonStats = async () => {
         if (!getMatchCollectionRef()) return;
         try {
@@ -320,17 +434,11 @@ export default function App() {
     };
 
     const saveMatchToFirebase = async () => {
-        if (!getMatchCollectionRef() || !matchId) return;
-        const serializableSubGroups = {};
-        for (const key in subGroups) { serializableSubGroups[key] = Array.from(subGroups[key]); }
-        const matchData = { matchId, matchName, homeTeamName, opponentTeamName, lastSaved: new Date().toISOString(), gameState, matchPhase, roster, lineup, liberos, liberoServingFor, liberoHasServedFor, setterId, bench, pointLog, playerStats, setStats, rotationScores, subGroups: serializableSubGroups };
-        try {
-            await setDoc(doc(getMatchCollectionRef(), matchId), matchData);
-            alert("Match saved successfully!");
-        } catch (error) {
-            console.error("Error saving match:", error);
-            alert("Error: Could not save match.");
+        if (autoSaveTimeoutRef.current) {
+            clearTimeout(autoSaveTimeoutRef.current);
         }
+        await autoSaveMatchToFirebase();
+        alert("Match saved successfully!");
     };
 
     const loadMatchesFromFirebase = async () => {
@@ -597,6 +705,10 @@ export default function App() {
     };
 
     const assignKwdaAssist = (assistPlayerId) => {
+        if (!assistPlayerId) { // Handle "No Assist"
+            setModal(null); setStatToAssign(null); setKwdaAttackerId(null);
+            return;
+        }
         const player = roster.find(p => p.id === assistPlayerId); if (!player) return;
         const updateAssistStats = (stats) => { const newStats = JSON.parse(JSON.stringify(stats)); const increment = (pId, s) => { if (!newStats[pId]) newStats[pId] = {}; newStats[pId][s] = (newStats[pId][s] || 0) + 1; }; increment(assistPlayerId, 'Assist'); increment(assistPlayerId, 'Set Attempt'); return newStats; };
         setPlayerStats(prev => updateAssistStats(prev)); setSetStats(prev => updateAssistStats(prev));
@@ -604,37 +716,40 @@ export default function App() {
     };
 
     const assignSetAttempt = (setterId) => {
-        const setter = roster.find(p => p.id === setterId);
         const { attackerId, originalStat } = hitContext;
         const attacker = roster.find(p => p.id === attackerId);
-        if (!setter || !attacker) return;
+        if (!attacker) return;
 
-        const updateAttackerStats = (stats) => {
-            const newStats = JSON.parse(JSON.stringify(stats));
+        const updateStats = (stats) => {
+            let newStats = JSON.parse(JSON.stringify(stats));
             const increment = (pId, s) => { if (!newStats[pId]) { newStats[pId] = {}; } newStats[pId][s] = (newStats[pId][s] || 0) + 1; };
+
             increment(attackerId, originalStat);
             increment(attackerId, 'Hit Attempt');
+
+            if (setterId) {
+                increment(setterId, 'Set Attempt');
+            }
             return newStats;
         };
 
-        const updateSetterStats = (stats) => {
-            const newStats = JSON.parse(JSON.stringify(stats));
-            const increment = (pId, s) => { if (!newStats[pId]) newStats[pId] = {}; newStats[pId][s] = (newStats[pId][s] || 0) + 1; };
-            increment(setterId, 'Set Attempt');
-            return newStats;
-        };
+        setPlayerStats(prev => updateStats(prev));
+        setSetStats(prev => updateStats(prev));
 
-        setPlayerStats(prev => updateSetterStats(updateAttackerStats(prev)));
-        setSetStats(prev => updateSetterStats(updateAttackerStats(prev)));
+        let logMessage = originalStat === 'Hit Error' ? `O: Hit Error by #${attacker.number} ${attacker.name}` : `H: Hit Attempt by #${attacker.number} ${attacker.name}`;
 
-        let logMessage;
+        if (setterId) {
+            const setter = roster.find(p => p.id === setterId);
+            if(setter) {
+                setPointLog(prev => [logMessage, `H: Set by #${setter.number} ${setter.name}`, ...prev]);
+            }
+        } else {
+            setPointLog(prev => [logMessage, ...prev]);
+        }
+
         if (originalStat === 'Hit Error') {
             awardPoint('opponent', 'Hit Error');
-            logMessage = `O: Hit Error by #${attacker.number} ${attacker.name}`;
-        } else {
-            logMessage = `H: Hit Attempt by #${attacker.number} ${attacker.name}`;
         }
-        setPointLog(prev => [logMessage, `H: Set by #${setter.number} ${setter.name}`, ...prev]);
 
         setModal(null);
         setStatToAssign(null);
@@ -644,13 +759,20 @@ export default function App() {
     // --- Sub Logic ---
     const handleSubClick = (position, playerOutId) => {
         if (!playerOutId) return;
-        setSubTarget({ position, playerOutId }); setModal('substitute');
+        const outGroup = subGroups[playerOutId] || new Set([playerOutId]);
+        if (!subGroups[playerOutId]) {
+            setSubGroups(prev => ({...prev, [playerOutId]: outGroup}));
+        }
+        setSubTarget({ position, playerOutId });
+        setModal('substitute');
     };
 
     const executeSubstitution = (playerInId) => {
         saveToHistory();
         const { position, playerOutId } = subTarget;
-        const outGroup = subGroups[playerOutId]; const inGroup = subGroups[playerInId];
+        const outGroup = subGroups[playerOutId];
+        const inGroup = subGroups[playerInId];
+
         if (inGroup && inGroup !== outGroup) { setModal('illegal-sub'); return; }
         setLineup(prev => ({ ...prev, [position]: playerInId }));
         setBench(prev => [...prev.filter(p => p.id !== playerInId), roster.find(p => p.id === playerOutId)]);
@@ -680,7 +802,7 @@ export default function App() {
         return courtOrder.map(pos => {
             const playerId = lineup[pos];
             const player = roster.find(p => p.id === playerId);
-            return ( <PlayerCard key={pos} player={player} isSetter={playerId === setterId} onClick={() => isSetupMode ? handleCourtClickForLineup(pos) : handleSubClick(pos, playerId)} statLeaders={statLeaders} /> );
+            return ( <PlayerCard key={pos} player={player} isSetter={playerId === setterId} onClick={() => isSetupMode ? handleCourtClickForLineup(pos) : handleSubClick(pos, playerId)} statLeaders={statLeaders} playerSetStats={setStats[playerId]} /> );
         });
     };
 
@@ -696,30 +818,50 @@ export default function App() {
         }
 
         return (
-            <div className="bg-gray-900 p-4 rounded-lg shadow-lg flex justify-around items-center text-white mb-4">
-                <div className="text-center"><div className="text-lg text-cyan-400 uppercase">{homeTeamName}</div><div className="text-5xl font-bold">{gameState.homeScore}</div><div className="text-sm">Sets: {gameState.homeSetsWon}</div></div>
-                <div className="text-center">
+            <div className="bg-gray-900 p-2 rounded-lg shadow-lg flex justify-around items-start text-white mb-1">
+                <div className="flex flex-col items-center flex-1">
+                    <div className="text-center">
+                        <div className="text-base text-cyan-400 uppercase">{homeTeamName}</div>
+                        <div className="text-4xl font-bold">{gameState.homeScore}</div>
+                        <div className="text-sm">Sets: {gameState.homeSetsWon}</div>
+                    </div>
+                    <div className="mt-1 flex flex-col items-center w-full">
+                        <h2 className="text-xs font-bold text-cyan-400 mb-1 uppercase">Liberos</h2>
+                        <div className="flex space-x-1 justify-center">
+                            {liberos.length > 0 ? liberos.map(liberoId => (
+                                <div className="w-24" key={liberoId}>
+                                    <PlayerCard player={roster.find(p => p.id === liberoId)} isSetter={false} statLeaders={statLeaders} playerSetStats={setStats[liberoId]} />
+                                </div>
+                            )) : <div className="text-xs text-gray-500 h-20 flex items-center">None</div>}
+                        </div>
+                    </div>
+                </div>
+                <div className="text-center px-2 flex-1 mt-2">
                     <div className="text-sm">SET {gameState.currentSet}</div>
                     <div className={`text-lg font-bold ${rotationColorClass}`}>Rotation {gameState.rotation}</div>
                     <div className={`text-xs p-1 rounded mt-1 ${gameState.servingTeam === 'home' ? 'bg-green-500' : 'bg-gray-600'}`}>HOME SERVE</div>
                     <div className={`text-xs p-1 rounded mt-1 ${gameState.servingTeam === 'opponent' ? 'bg-green-500' : 'bg-gray-600'}`}>OPP SERVE</div>
-                    <div className="text-sm mt-2">SUBS: {gameState.homeSubs}</div>
+                    <div className="text-sm mt-1">SUBS: {gameState.homeSubs}</div>
                 </div>
-                <div className="text-center"><div className="text-lg text-red-400 uppercase">{opponentTeamName}</div><div className="text-5xl font-bold">{gameState.opponentScore}</div><div className="text-sm">Sets: {gameState.opponentSetsWon}</div></div>
+                <div className="text-center flex-1">
+                    <div className="text-base text-red-400 uppercase">{opponentTeamName}</div>
+                    <div className="text-4xl font-bold">{gameState.opponentScore}</div>
+                    <div className="text-sm">Sets: {gameState.opponentSetsWon}</div>
+                </div>
             </div>
         );
     };
 
-    const StatButton = ({ label, onClick, type }) => { const colors = { positive: 'bg-green-600 hover:bg-green-500', neutral: 'bg-blue-600 hover:bg-blue-500', negative: 'bg-red-600 hover:bg-red-500' }; return (<button onClick={onClick} className={`text-white font-bold py-3 px-2 rounded-lg shadow-md transition-transform transform hover:scale-105 ${colors[type]}`}>{label}</button>); };
+    const StatButton = ({ label, onClick, type }) => { const colors = { positive: 'bg-green-600 hover:bg-green-500', neutral: 'bg-blue-600 hover:bg-blue-500', negative: 'bg-red-600 hover:bg-red-500' }; return (<button onClick={onClick} className={`text-white font-bold py-2 px-1 rounded-lg shadow-md transition-transform transform hover:scale-105 text-sm ${colors[type]}`}>{label}</button>); };
 
     const StatPanel = () => (
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mt-4">
-            <div className="bg-gray-800 p-3 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2">SERVING</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Ace" onClick={() => handleStatClick('Ace')} type="positive" /><StatButton label="Serve Error" onClick={() => handleStatClick('Serve Error')} type="negative" /></div></div>
-            <div className="bg-gray-800 p-3 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2">HITTING</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Kill" onClick={() => handleStatClick('Kill')} type="positive" />{setterId !== null && <StatButton label="KWDA" onClick={() => handleStatClick('KWDA')} type="positive" />}<StatButton label="Hit Attempt" onClick={() => handleStatClick('Hit Attempt')} type="neutral" /><StatButton label="Hit Error" onClick={() => handleStatClick('Hit Error')} type="negative" /></div></div>
-            <div className="bg-gray-800 p-3 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2">PASSING</h3><div className="grid grid-cols-1 gap-2"><StatButton label="3-Pass" onClick={() => handleStatClick('3-Pass')} type="neutral" /><StatButton label="2-Pass" onClick={() => handleStatClick('2-Pass')} type="neutral" /><StatButton label="1-Pass" onClick={() => handleStatClick('1-Pass')} type="neutral" /><StatButton label="RE" onClick={() => handleStatClick('RE')} type="negative" /></div></div>
-            <div className="bg-gray-800 p-3 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2">SETTING</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Assist" onClick={() => handleStatClick('Assist')} type="neutral" /><StatButton label="Set Error" onClick={() => handleStatClick('Set Error')} type="negative" /></div></div>
-            <div className="bg-gray-800 p-3 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2">DEFENSE</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Dig" onClick={() => handleStatClick('Dig')} type="neutral" /><StatButton label="Block" onClick={() => handleStatClick('Block')} type="positive" /><StatButton label="Block Error" onClick={() => handleStatClick('Block Error')} type="negative" /></div></div>
-            <div className="bg-gray-800 p-3 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2">GAME</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Opponent Error" onClick={() => handleStatClick('Opponent Error')} type="positive" /><StatButton label="Opponent Point" onClick={() => handleStatClick('Opponent Point')} type="negative" /></div></div>
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mt-2">
+            <div className="bg-gray-800 p-2 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2 text-sm">SERVING</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Ace" onClick={() => handleStatClick('Ace')} type="positive" /><StatButton label="Serve Error" onClick={() => handleStatClick('Serve Error')} type="negative" /></div></div>
+            <div className="bg-gray-800 p-2 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2 text-sm">HITTING</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Kill" onClick={() => handleStatClick('Kill')} type="positive" />{setterId !== null && <StatButton label="KWDA" onClick={() => handleStatClick('KWDA')} type="positive" />}<StatButton label="Hit Attempt" onClick={() => handleStatClick('Hit Attempt')} type="neutral" /><StatButton label="Hit Error" onClick={() => handleStatClick('Hit Error')} type="negative" /></div></div>
+            <div className="bg-gray-800 p-2 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2 text-sm">PASSING</h3><div className="grid grid-cols-1 gap-2"><StatButton label="3-Pass" onClick={() => handleStatClick('3-Pass')} type="neutral" /><StatButton label="2-Pass" onClick={() => handleStatClick('2-Pass')} type="neutral" /><StatButton label="1-Pass" onClick={() => handleStatClick('1-Pass')} type="neutral" /><StatButton label="RE" onClick={() => handleStatClick('RE')} type="negative" /></div></div>
+            <div className="bg-gray-800 p-2 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2 text-sm">SETTING</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Assist" onClick={() => handleStatClick('Assist')} type="neutral" /><StatButton label="Set Error" onClick={() => handleStatClick('Set Error')} type="negative" /></div></div>
+            <div className="bg-gray-800 p-2 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2 text-sm">DEFENSE</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Dig" onClick={() => handleStatClick('Dig')} type="neutral" /><StatButton label="Block" onClick={() => handleStatClick('Block')} type="positive" /><StatButton label="Block Error" onClick={() => handleStatClick('Block Error')} type="negative" /></div></div>
+            <div className="bg-gray-800 p-2 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2 text-sm">GAME</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Opponent Error" onClick={() => handleStatClick('Opponent Error')} type="positive" /><StatButton label="Opponent Point" onClick={() => handleStatClick('Opponent Point')} type="negative" /></div></div>
         </div>
     );
 
@@ -727,7 +869,18 @@ export default function App() {
         const currentRoster = rosterData || roster;
         const STAT_ORDER = ['Serve Attempt', 'Ace', 'Serve Error', 'Hit Attempt', 'Kill', 'Hit Error', 'Set Attempt', 'Assist', 'Set Error', 'Block', 'Block Error', 'Dig'];
         const calculateHittingPercentage = (stats) => { if (!stats) return '.000'; const kills = stats['Kill'] || 0; const errors = stats['Hit Error'] || 0; const attempts = stats['Hit Attempt'] || 0; if (attempts === 0) return '.000'; return ((kills - errors) / attempts).toFixed(3); };
-        const teamTotals = STAT_ORDER.reduce((acc, stat) => { acc[stat] = currentRoster.reduce((total, player) => total + (statsData[player.id]?.[stat] || 0), 0); return acc; }, {});
+
+        const teamTotals = {};
+        const allStatKeys = new Set(STAT_ORDER);
+        rosterData.forEach(p => {
+            if(statsData[p.id]) {
+                Object.keys(statsData[p.id]).forEach(stat => allStatKeys.add(stat));
+            }
+        });
+
+        allStatKeys.forEach(stat => {
+            teamTotals[stat] = currentRoster.reduce((total, player) => total + (statsData[player.id]?.[stat] || 0), 0);
+        });
 
         return (
             <div className="p-3 overflow-x-auto">
@@ -737,6 +890,7 @@ export default function App() {
                             <th className="px-4 py-2">Player</th>
                             {STAT_ORDER.map(stat => <th key={stat} className="px-2 py-2 text-center">{stat.replace('Attempt', 'Att').replace('Error', 'Err')}</th>)}
                             <th className="px-2 py-2 text-center">Hit %</th>
+                            <th className="px-2 py-2 text-center">VBRT</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -745,14 +899,16 @@ export default function App() {
                                 <td className="px-4 py-2 font-medium whitespace-nowrap">#{player.number} {player.name}</td>
                                 {STAT_ORDER.map(stat => (<td key={stat} className="px-2 py-2 text-center">{statsData[player.id]?.[stat] || 0}</td>))}
                                 <td className="px-2 py-2 text-center">{calculateHittingPercentage(statsData[player.id])}</td>
+                                <td className="px-2 py-2 text-center font-bold">{calculateVbrt(statsData[player.id])}</td>
                             </tr>
                         ))}
                     </tbody>
                     <tfoot>
                         <tr className="font-bold text-cyan-400 bg-gray-700">
                             <td className="px-4 py-2">TEAM TOTAL</td>
-                            {STAT_ORDER.map(stat => (<td key={stat} className="px-2 py-2 text-center">{teamTotals[stat]}</td>))}
+                            {STAT_ORDER.map(stat => (<td key={stat} className="px-2 py-2 text-center">{teamTotals[stat] || 0}</td>))}
                             <td className="px-2 py-2 text-center">{calculateHittingPercentage(teamTotals)}</td>
+                            <td className="px-2 py-2 text-center font-bold">{calculateVbrt(teamTotals)}</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -833,6 +989,7 @@ export default function App() {
                             <th className="px-4 py-2">Player</th>
                             {STAT_ORDER.map(stat => <th key={stat} className="px-2 py-2 text-center">{stat.replace('Attempt', 'Att').replace('Error', 'Err').replace('Reception', 'Rec')}</th>)}
                             <th className="px-2 py-2 text-center">Hit %</th>
+                            <th className="px-2 py-2 text-center">VBRT</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -844,6 +1001,7 @@ export default function App() {
                                     <td className="px-4 py-2 font-medium whitespace-nowrap">#{player.number} {player.name}</td>
                                     {STAT_ORDER.map(stat => <td key={stat} className="px-2 py-2 text-center">{playerStats[stat] || 0}</td>)}
                                     <td className="px-2 py-2 text-center">{calculateHittingPercentage(playerStats)}</td>
+                                    <td className="px-2 py-2 text-center font-bold">{calculateVbrt(playerStats)}</td>
                                 </tr>
                             );
                         })}
@@ -851,8 +1009,9 @@ export default function App() {
                     <tfoot>
                         <tr className="font-bold text-cyan-400 bg-gray-700">
                             <td className="px-4 py-2">TEAM TOTAL</td>
-                            {STAT_ORDER.map(stat => <td key={stat} className="px-2 py-2 text-center">{teamTotals[stat]}</td>)}
+                            {STAT_ORDER.map(stat => <td key={stat} className="px-2 py-2 text-center">{teamTotals[stat] || 0}</td>)}
                             <td className="px-2 py-2 text-center">{calculateHittingPercentage(teamTotals)}</td>
+                            <td className="px-2 py-2 text-center font-bold">{calculateVbrt(teamTotals)}</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -909,7 +1068,7 @@ export default function App() {
             <div>
                 <div className="p-4 text-center bg-gray-800 rounded-lg mb-4"><h2 className="text-xl font-bold text-cyan-400">{setupInstructions[setupStep]}</h2></div>
                 <h2 className="text-xl font-bold text-center mb-2 text-cyan-400">Set Initial Lineup</h2>
-                <div className="grid grid-cols-3 gap-4 mb-4">{renderCourt(true)}</div>
+                <div className="grid grid-cols-3 gap-2 mb-2">{renderCourt(true)}</div>
 
                 {setupStep === 'setter' && ( <div className="text-center mt-4"> <button onClick={() => { setSetterId(null); setModal('select-server'); }} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg" > Continue Without a Designated Setter </button> </div> )}
                 {setupStep === 'libero_serve' && (
@@ -945,14 +1104,14 @@ export default function App() {
     const SelectServerModal = () => (<div><p className="mb-4 font-bold">Who is serving first?</p><div className="flex justify-around"><button onClick={() => handleStartSet('home')} className="bg-cyan-600 hover:bg-cyan-500 p-3 rounded-lg w-32 font-bold">Home</button><button onClick={() => handleStartSet('opponent')} className="bg-red-600 hover:bg-red-500 p-3 rounded-lg w-32 font-bold">Opponent</button></div></div>);
     const SubstituteModal = () => (<div><p className="mb-4">Select a player from the bench to substitute in.</p><div className="space-y-2 max-h-80 overflow-y-auto">{bench.map(player => (<button key={player.id} onClick={() => executeSubstitution(player.id)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">#{player.number} {player.name}</button>))}</div></div>);
     const AssignStatModal = () => { const onCourtIds = [...Object.values(lineup), ...liberos].filter(Boolean); const onCourtPlayers = roster.filter(p => onCourtIds.includes(p.id)); return (<div><p className="mb-4">Assign <span className="font-bold text-cyan-400">{statToAssign}</span> to:</p><div className="space-y-2 max-h-80 overflow-y-auto">{onCourtPlayers.map(player => (<button key={player.id} onClick={() => assignStatToPlayer(player.id)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">#{player.number} {player.name}</button>))}</div></div>); };
-    const AssignKwdaAssistModal = () => { const onCourtIds = [...Object.values(lineup), ...liberos].filter(Boolean); const onCourtPlayers = roster.filter(p => onCourtIds.includes(p.id) && p.id !== kwdaAttackerId); return (<div><p className="mb-4">Assign <span className="font-bold text-cyan-400">Assist</span> for Kill to:</p><div className="space-y-2 max-h-80 overflow-y-auto">{onCourtPlayers.map(player => (<button key={player.id} onClick={() => assignKwdaAssist(player.id)} className="relative w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">#{player.number} {player.name} {player.id === setterId && <SetterIcon />}</button>))}</div></div>); };
+    const AssignKwdaAssistModal = () => { const onCourtIds = [...Object.values(lineup), ...liberos].filter(Boolean); const onCourtPlayers = roster.filter(p => onCourtIds.includes(p.id) && p.id !== kwdaAttackerId); return (<div><p className="mb-4">Assign <span className="font-bold text-cyan-400">Assist</span> for Kill to:</p><div className="space-y-2 max-h-80 overflow-y-auto">{onCourtPlayers.map(player => (<button key={player.id} onClick={() => assignKwdaAssist(player.id)} className="relative w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">#{player.number} {player.name} {player.id === setterId && <SetterIcon />}</button>))} <button onClick={() => assignKwdaAssist(null)} className="mt-2 w-full text-center bg-gray-600 hover:bg-gray-500 p-2 rounded">No Assist</button> </div></div>); };
     const SelectNewSetterModal = () => { const onCourtIds = [...Object.values(lineup), ...liberos].filter(Boolean); const onCourtPlayers = roster.filter(p => onCourtIds.includes(p.id) && p.id !== setterId); const handleSelect = (playerId) => { saveToHistory(); setSetterId(playerId); setModal(null); }; return ( <div> <p className="mb-4">Select the new designated setter from the players on the court.</p> <div className="space-y-2 max-h-80 overflow-y-auto"> {onCourtPlayers.map(player => ( <button key={player.id} onClick={() => handleSelect(player.id)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded"> #{player.number} {player.name} </button> ))} </div> </div> ); };
-    const AssignSetAttemptModal = () => { const onCourtIds = [...Object.values(lineup), ...liberos].filter(Boolean); const onCourtPlayers = roster.filter(p => onCourtIds.includes(p.id) && p.id !== hitContext.attackerId); return ( <div> <p className="mb-4">Assign <span className="font-bold text-cyan-400">Set Attempt</span> for {hitContext.originalStat} to:</p> <div className="space-y-2 max-h-80 overflow-y-auto"> {onCourtPlayers.map(player => ( <button key={player.id} onClick={() => assignSetAttempt(player.id)} className="relative w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded"> #{player.number} {player.name} {player.id === setterId && <SetterIcon />} </button> ))} </div> </div> ); };
+    const AssignSetAttemptModal = () => { const onCourtIds = [...Object.values(lineup), ...liberos].filter(Boolean); const onCourtPlayers = roster.filter(p => onCourtIds.includes(p.id) && p.id !== hitContext.attackerId); return ( <div> <p className="mb-4">Assign <span className="font-bold text-cyan-400">Set Attempt</span> for {hitContext.originalStat} to:</p> <div className="space-y-2 max-h-80 overflow-y-auto"> {onCourtPlayers.map(player => ( <button key={player.id} onClick={() => assignSetAttempt(player.id)} className="relative w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded"> #{player.number} {player.name} {player.id === setterId && <SetterIcon />} </button> ))} <button onClick={() => assignSetAttempt(null)} className="mt-2 w-full text-center bg-gray-600 hover:bg-gray-500 p-2 rounded">No Set</button> </div> </div> ); };
 
     // --- Main Render ---
     return (
         <div className="bg-gray-900 min-h-screen text-white font-sans p-4">
-            <div className="container mx-auto max-w-5xl">
+            <div className="container mx-auto max-w-6xl">
 
                 {matchPhase === 'pre_match' && ( <div className="flex flex-col items-center justify-center h-screen"> <h1 className="text-4xl font-bold mb-4 text-cyan-400">Volleyball Stat Tracker</h1> <div className="space-y-4"> <button onClick={handleStartNewMatch} className="w-64 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg text-xl">Start New Match</button> <button onClick={loadMatchesFromFirebase} disabled={!isAuthReady} className="w-64 bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg text-xl disabled:bg-gray-700 disabled:cursor-not-allowed">Load Match</button> </div> </div> )}
                 {matchPhase === 'post_match' && ( <div className="text-center p-8"> <h1 className="text-4xl font-bold text-cyan-400 mb-4">Match Over</h1> <Scoreboard /> <TabbedDisplay /> <button onClick={() => setMatchPhase('pre_match')} className="mt-8 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg text-xl">Return to Main Menu</button> </div> )}
@@ -960,20 +1119,20 @@ export default function App() {
                 {matchPhase === 'playing' && (
                     <>
                         <Scoreboard />
-                        <div className="flex justify-end space-x-2 mb-4"> <button onClick={() => setModal('change-setter-confirm')} className="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg">Change Setter</button> <button onClick={() => setModal('end-set-confirm')} className="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg">End Current Set</button> <button onClick={saveMatchToFirebase} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg">Save Match</button> </div>
-                        <h2 className="text-xl font-bold text-center mb-2 text-cyan-400">Court</h2>
-                        <div className="grid grid-cols-3 gap-4 mb-4">{renderCourt(false)}</div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            <div className="md:col-span-1 flex flex-col items-center">
-                                <h2 className="text-xl font-bold mb-2 text-cyan-400">Designated Liberos</h2>
-                                <div className="flex space-x-2"> {liberos.length > 0 ? liberos.map(liberoId => ( <div className="w-32" key={liberoId}> <PlayerCard player={roster.find(p => p.id === liberoId)} isSetter={false} statLeaders={statLeaders} /> </div> )) : <div className="w-32 h-24 flex items-center justify-center bg-gray-800 rounded-lg text-gray-500">No Libero</div>} </div>
-                            </div>
-                            <div className="md:col-span-2">
-                                <h2 className="text-xl font-bold text-center md:text-left mb-2 text-cyan-400">Bench</h2>
-                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2"> {bench.map(p => ( <div key={p.id} className="bg-gray-800 p-2 rounded text-center text-sm h-16 flex flex-col justify-center"> <div>#{p.number}</div> <div className="truncate">{p.name}</div> </div> ))} </div>
-                            </div>
+                        <div className="flex justify-end items-center space-x-2 mb-1">
+                             <span className="text-xs text-gray-400 italic">{autoSaveStatus}</span>
+                            <button onClick={() => setModal('change-setter-confirm')} className="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg">Change Setter</button>
+                            <button onClick={() => setModal('end-set-confirm')} className="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg">End Current Set</button>
+                            <button onClick={saveMatchToFirebase} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg">Save Match</button>
                         </div>
-                        <StatPanel /> <TabbedDisplay />
+                        <h2 className="text-lg font-bold text-center mb-1 text-cyan-400">Court</h2>
+                        <div className="grid grid-cols-3 gap-2 mb-2">{renderCourt(false)}</div>
+                        <StatPanel />
+                        <div className="mt-2 bg-gray-800 p-2 rounded-lg">
+                            <h2 className="text-lg font-bold text-center md:text-left mb-2 text-cyan-400">Bench</h2>
+                            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2"> {bench.map(p => ( <div key={p.id} className="bg-gray-900 p-1 rounded text-center text-xs h-16 flex flex-col justify-center"> <div>#{p.number}</div> <div className="truncate">{p.name}</div> </div> ))} </div>
+                        </div>
+                        <TabbedDisplay />
                     </>
                 )}
 
