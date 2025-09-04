@@ -361,6 +361,7 @@ export default function App() {
     const getMatchCollectionRef = useCallback(() => {
         if (!db || !userId) return null;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // Using a path that works within the collaborative app environment
         return collection(db, 'artifacts', appId, 'users', userId, 'matches');
     }, [db, userId]);
 
