@@ -330,9 +330,19 @@ export default function App() {
 
     // --- Firebase Initialization & Auth ---
     useEffect(() => {
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const inPreview = typeof __firebase_config !== 'undefined';
+        const firebaseConfigString = inPreview
+            ? __firebase_config
+            : (window.VITE_FIREBASE_CONFIG || null);
+
+        if (!firebaseConfigString) {
+            console.error("Firebase config is missing. Make sure it's set in your environment variables.");
+            setAutoSaveStatus('Config Error!');
+            return;
+        }
 
         try {
+            const firebaseConfig = JSON.parse(firebaseConfigString);
             const app = initializeApp(firebaseConfig);
             const firestoreDb = getFirestore(app);
             const firebaseAuth = getAuth(app);
@@ -343,7 +353,7 @@ export default function App() {
                 if (user) {
                     setUserId(user.uid);
                 } else {
-                    const authToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                    const authToken = inPreview ? (typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null) : null;
                     if (authToken) {
                         await signInWithCustomToken(firebaseAuth, authToken);
                     } else {
@@ -354,15 +364,17 @@ export default function App() {
             });
         } catch (error) {
             console.error("Firebase initialization error:", error);
+            setAutoSaveStatus('Config Error!');
         }
     }, []);
 
     // --- Data Persistence & Season Stats ---
     const getMatchCollectionRef = useCallback(() => {
         if (!db || !userId) return null;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        // Using a path that works within the collaborative app environment
-        return collection(db, 'artifacts', appId, 'users', userId, 'matches');
+        const inPreview = typeof __app_id !== 'undefined';
+        return inPreview
+            ? collection(db, 'artifacts', __app_id, 'users', userId, 'matches')
+            : collection(db, 'users', userId, 'matches');
     }, [db, userId]);
 
     const autoSaveMatchToFirebase = useCallback(async () => {
