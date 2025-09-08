@@ -329,15 +329,28 @@ export default function App() {
 
 
     // --- Firebase Initialization & Auth ---
-   const firebaseConfig = {
-  apiKey: "AIzaSyBjwF3op5ssqIxCye_RVTgnXMmn2bVIjs4",
-  authDomain: "my-volleyball-stats.firebaseapp.com",
-  projectId: "my-volleyball-stats",
-  storageBucket: "my-volleyball-stats.firebasestorage.app",
-  messagingSenderId: "186322710860",
-  appId: "1:186322710860:web:78394224ca3af398bb5fe9",
-  measurementId: "G-4X3P912GF9"
-};
+
+    useEffect(() => {
+    // This part is new: Build the config object from Vercel's environment variables
+    const firebaseConfig = {
+      apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+      authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.REACT_APP_FIREBASE_APP_ID
+    };
+
+    // This check is a good safety measure
+    if (!firebaseConfig.apiKey) {
+      console.error("Firebase config is missing. Make sure environment variables are set in Vercel.");
+      return;
+    }
+
+    try {
+        // This line is now using the config object we just built
+        const app = initializeApp(firebaseConfig);
+        const firestoreDb = getFirestore(app);
           
 
     // --- Data Persistence & Season Stats ---
