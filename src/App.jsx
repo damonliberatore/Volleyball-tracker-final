@@ -330,8 +330,9 @@ export default function App() {
 
     // --- Firebase Initialization & Auth ---
 
-    useEffect(() => {
-    // This part is new: Build the config object from Vercel's environment variables
+   // This is the full, corrected useEffect hook. Replace your existing one with this.
+useEffect(() => {
+    // Build the config object from Vercel's environment variables
     const firebaseConfig = {
       apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
       authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
@@ -341,16 +342,35 @@ export default function App() {
       appId: process.env.REACT_APP_FIREBASE_APP_ID
     };
 
-    // This check is a good safety measure
+    // Check if the config is valid before initializing
     if (!firebaseConfig.apiKey) {
       console.error("Firebase config is missing. Make sure environment variables are set in Vercel.");
       return;
     }
 
     try {
-        // This line is now using the config object we just built
-        const app = initializeApp(firebaseConfig);
-        const firestoreDb = getFirestore(app);
+      const app = initializeApp(firebaseConfig);
+      const firestoreDb = getFirestore(app);
+      const firebaseAuth = getAuth(app);
+      setDb(firestoreDb);
+      setAuth(firebaseAuth);
+      onAuthStateChanged(firebaseAuth, async (user) => {
+        if (user) {
+          setUserId(user.uid);
+        } else {
+          const authToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+          if (authToken) {
+            await signInWithCustomToken(firebaseAuth, authToken);
+          } else {
+            await signInAnonymously(firebaseAuth);
+          }
+        }
+        setIsAuthReady(true);
+      });
+    } catch (error) { // This is the block that was missing
+      console.error("Firebase initialization error:", error);
+    }
+}, []); // The empty array dependency ensures this runs only once
           
 
     // --- Data Persistence & Season Stats ---
@@ -1157,4 +1177,3 @@ export default function App() {
         </div>
     );
 }
-
