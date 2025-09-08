@@ -329,52 +329,22 @@ export default function App() {
 
 
     // --- Firebase Initialization & Auth ---
-    useEffect(() => {
-        const inPreview = typeof __firebase_config !== 'undefined';
-        const firebaseConfigString = inPreview
-            ? __firebase_config
-            : (window.VITE_FIREBASE_CONFIG || null);
-
-        if (!firebaseConfigString) {
-            console.error("Firebase config is missing. Make sure it's set in your environment variables.");
-            setAutoSaveStatus('Config Error!');
-            return;
-        }
-
-        try {
-            const firebaseConfig = JSON.parse(firebaseConfigString);
-            const app = initializeApp(firebaseConfig);
-            const firestoreDb = getFirestore(app);
-            const firebaseAuth = getAuth(app);
-            setDb(firestoreDb);
-            setAuth(firebaseAuth);
-
-            onAuthStateChanged(firebaseAuth, async (user) => {
-                if (user) {
-                    setUserId(user.uid);
-                } else {
-                    const authToken = inPreview ? (typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null) : null;
-                    if (authToken) {
-                        await signInWithCustomToken(firebaseAuth, authToken);
-                    } else {
-                        await signInAnonymously(firebaseAuth);
-                    }
-                }
-                setIsAuthReady(true);
-            });
-        } catch (error) {
-            console.error("Firebase initialization error:", error);
-            setAutoSaveStatus('Config Error!');
-        }
-    }, []);
+   const firebaseConfig = {
+  apiKey: "AIzaSyBjwF3op5ssqIxCye_RVTgnXMmn2bVIjs4",
+  authDomain: "my-volleyball-stats.firebaseapp.com",
+  projectId: "my-volleyball-stats",
+  storageBucket: "my-volleyball-stats.firebasestorage.app",
+  messagingSenderId: "186322710860",
+  appId: "1:186322710860:web:78394224ca3af398bb5fe9",
+  measurementId: "G-4X3P912GF9"
+};
+          
 
     // --- Data Persistence & Season Stats ---
     const getMatchCollectionRef = useCallback(() => {
         if (!db || !userId) return null;
-        const inPreview = typeof __app_id !== 'undefined';
-        return inPreview
-            ? collection(db, 'artifacts', __app_id, 'users', userId, 'matches')
-            : collection(db, 'users', userId, 'matches');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        return collection(db, 'artifacts', appId, 'users', userId, 'matches');
     }, [db, userId]);
 
     const autoSaveMatchToFirebase = useCallback(async () => {
