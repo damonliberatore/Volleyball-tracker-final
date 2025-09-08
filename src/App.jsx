@@ -330,25 +330,25 @@ export default function App() {
 
     // --- Firebase Initialization & Auth ---
 
-   // This is the full, corrected useEffect hook. Replace your existing one with this.
+// This is the final version for a VITE project
 useEffect(() => {
-    // Build the config object from Vercel's environment variables
+    // Vite uses import.meta.env to access environment variables
     const firebaseConfig = {
-      apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-      authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-      projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-      storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-      appId: process.env.REACT_APP_FIREBASE_APP_ID
+      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+      appId: import.meta.env.VITE_FIREBASE_APP_ID
     };
 
-    // Check if the config is valid before initializing
     if (!firebaseConfig.apiKey) {
-      console.error("Firebase config is missing. Make sure environment variables are set in Vercel.");
+      console.error("Firebase config is missing. Make sure VITE_ environment variables are set in Vercel.");
       return;
     }
 
     try {
+
       const app = initializeApp(firebaseConfig);
       const firestoreDb = getFirestore(app);
       const firebaseAuth = getAuth(app);
@@ -367,10 +367,10 @@ useEffect(() => {
         }
         setIsAuthReady(true);
       });
-    } catch (error) { // This is the block that was missing
+    } catch (error) {
       console.error("Firebase initialization error:", error);
     }
-}, []); // The empty array dependency ensures this runs only once
+}, []);
           
 
     // --- Data Persistence & Season Stats ---
