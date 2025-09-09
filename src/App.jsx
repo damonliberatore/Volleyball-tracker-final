@@ -1,7 +1,7 @@
-// App.js - Complete Updated Code
+// App.js - Complete Code with "Load Roster" Feature
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 
 // --- Helper Components ---
@@ -299,7 +299,6 @@ return leaders;
 
 // --- Firebase Initialization & Auth ---
 useEffect(() => {
-// Vite uses import.meta.env to access environment variables
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -308,12 +307,10 @@ const firebaseConfig = {
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
-
 if (!firebaseConfig.apiKey) {
   console.error("Firebase config is missing. Make sure VITE_ environment variables are set in Vercel.");
   return;
 }
-
 try {
   const app = initializeApp(firebaseConfig);
   const firestoreDb = getFirestore(app);
@@ -439,6 +436,22 @@ restoredSubGroups[key] = new Set(matchData.subGroups[key]);
 setMatchId(matchData.matchId); setMatchName(matchData.matchName); setHomeTeamName(matchData.homeTeamName || 'HOME'); setOpponentTeamName(matchData.opponentTeamName || 'OPPONENT'); setGameState(matchData.gameState); setMatchPhase(matchData.matchPhase); setRoster(matchData.roster); setLineup(matchData.lineup); setLiberos(matchData.liberos || []); setLiberoServingFor(matchData.liberoServingFor || null);
 setLiberoHasServedFor(matchData.liberoHasServedFor || null); setSetterId(matchData.setterId); setBench(matchData.bench); setPointLog(matchData.pointLog); setPlayerStats(matchData.playerStats); setSetStats(matchData.setStats || {}); setRotationScores(matchData.rotationScores); setSubGroups(restoredSubGroups); setHistory([]); setModal(null);
 setCurrentServerId(matchData.lineup?.p1 || null);
+};
+
+const loadMostRecentRoster = async () => {
+  if (!getMatchCollectionRef()) return null;
+  const q = query(getMatchCollectionRef(), orderBy("lastSaved", "desc"), limit(1));
+  try {
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      const lastMatch = querySnapshot.docs[0].data();
+      return lastMatch.roster;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error loading most recent roster:", error);
+    return null;
+  }
 };
 
 // --- Undo and History Logic ---
@@ -1039,7 +1052,7 @@ return (
 <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
 {availableForLibero.map(p => ( <PlayerCard key={p.id} player={p} onClick={() => handleToggleLibero(p.id)} isSelected={tempLiberos.has(p.id)} /> ))}
 </div>
-<div className="text-center mt-4"> <button onClick={confirmLiberos} className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-6 rounded-lg"> Confirm Liberos & Continue </button> d</div>
+<div className="text-center mt-4"> <button onClick={confirmLiberos} className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-6 rounded-lg"> Confirm Liberos & Continue </button> </div>
 </>
 )}
 </div>
@@ -1047,14 +1060,61 @@ return (
 };
 
 // --- Modal Content Components ---
-const RosterModal = () => { const [localRoster, setLocalRoster] = useState([{ number: '', name: '' }]);
-const [localMatchName, setLocalMatchName] = useState(''); const [localHomeTeam, setLocalHomeTeam] = useState(''); const [localOpponentTeam, setLocalOpponentTeam] = useState('');
-const addPlayer = () => setLocalRoster([...localRoster, { number: '', name: '' }]);
-const updatePlayer = (index, field, value) => { if (field === 'number' && value && parseInt(value, 10) < 0) return;
-const newRoster = [...localRoster]; newRoster[index][field] = value; setLocalRoster(newRoster); }; const handleSubmit = (e) => { e.preventDefault();
-const filtered = localRoster.filter(p => p.number && p.name); if (filtered.length < 6) { alert("Please enter at least 6 players."); return;
-} handleSaveRoster(filtered, localMatchName, localHomeTeam, localOpponentTeam); }; return (<form onSubmit={handleSubmit}> <div className="grid grid-cols-2 gap-4 mb-4"> <input type="text" placeholder="Home Team Name" value={localHomeTeam} onChange={(e) => setLocalHomeTeam(e.target.value)} className="bg-gray-700 p-2 rounded w-full" required /> <input type="text" placeholder="Opponent Team Name" value={localOpponentTeam} onChange={(e) => setLocalOpponentTeam(e.target.value)} className="bg-gray-700 p-2 rounded w-full" required /> </div> <input type="text" placeholder="Match Name (e.g., vs. Rival High)" value={localMatchName} onChange={(e) => setLocalMatchName(e.target.value)} className="bg-gray-700 p-2 rounded w-full mb-4" /> <div className="space-y-3 max-h-60 overflow-y-auto pr-2">{localRoster.map((p, i) => (<div key={i} className="flex items-center space-x-2"><input type="number" placeholder="#" value={p.number} min="0" onChange={(e) => updatePlayer(i, 'number', e.target.value)} className="bg-gray-700 p-2 rounded w-20 text-center" required /><input type="text" placeholder="Player Name" value={p.name} onChange={(e) => updatePlayer(i, 'name', e.target.value)}
-className="bg-gray-700 p-2 rounded w-full" required /></div>))}</div> <button type="button" onClick={addPlayer} className="mt-4 w-full bg-gray-600 hover:bg-gray-500 p-2 rounded">Add Player</button> <button type="submit" className="mt-2 w-full bg-cyan-600 hover:bg-cyan-500 p-2 rounded font-bold">Save & Start Match</button> </form>);
+const RosterModal = () => {
+  const [localRoster, setLocalRoster] = useState([{ number: '', name: '' }]);
+  const [localMatchName, setLocalMatchName] = useState('');
+  const [localHomeTeam, setLocalHomeTeam] = useState('');
+  const [localOpponentTeam, setLocalOpponentTeam] = useState('');
+
+  const addPlayer = () => setLocalRoster([...localRoster, { number: '', name: '' }]);
+
+  const updatePlayer = (index, field, value) => {
+    if (field === 'number' && value && parseInt(value, 10) < 0) return;
+    const newRoster = [...localRoster];
+    newRoster[index][field] = value;
+    setLocalRoster(newRoster);
+  };
+
+  const handleLoadRoster = async () => {
+    const roster = await loadMostRecentRoster();
+    if (roster && roster.length > 0) {
+      const rosterToLoad = roster.map(({ name, number }) => ({ name, number }));
+      setLocalRoster(rosterToLoad);
+    } else {
+      alert("No previous roster found.");
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const filtered = localRoster.filter(p => p.number && p.name);
+    if (filtered.length < 6) {
+      alert("Please enter at least 6 players.");
+      return;
+    }
+    handleSaveRoster(filtered, localMatchName, localHomeTeam, localOpponentTeam);
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <input type="text" placeholder="Home Team Name" value={localHomeTeam} onChange={(e) => setLocalHomeTeam(e.target.value)} className="bg-gray-700 p-2 rounded w-full" required />
+        <input type="text" placeholder="Opponent Team Name" value={localOpponentTeam} onChange={(e) => setLocalOpponentTeam(e.target.value)} className="bg-gray-700 p-2 rounded w-full" required />
+      </div>
+      <input type="text" placeholder="Match Name (e.g., vs. Rival High)" value={localMatchName} onChange={(e) => setLocalMatchName(e.target.value)} className="bg-gray-700 p-2 rounded w-full mb-4" />
+      <button type="button" onClick={handleLoadRoster} className="mb-4 w-full bg-blue-600 hover:bg-blue-500 p-2 rounded">Load Previous Roster</button>
+      <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+        {localRoster.map((p, i) => (
+          <div key={i} className="flex items-center space-x-2">
+            <input type="number" placeholder="#" value={p.number} min="0" onChange={(e) => updatePlayer(i, 'number', e.target.value)} className="bg-gray-700 p-2 rounded w-20 text-center" required />
+            <input type="text" placeholder="Player Name" value={p.name} onChange={(e) => updatePlayer(i, 'name', e.target.value)} className="bg-gray-700 p-2 rounded w-full" required />
+          </div>
+        ))}
+      </div>
+      <button type="button" onClick={addPlayer} className="mt-4 w-full bg-gray-600 hover:bg-gray-500 p-2 rounded">Add Player</button>
+      <button type="submit" className="mt-2 w-full bg-cyan-600 hover:bg-cyan-500 p-2 rounded font-bold">Save & Start Match</button>
+    </form>
+  );
 };
 
 const LoadMatchModal = () => ( <div> {savedMatches.length === 0 ? <p>No saved matches found.</p> : ( <div className="space-y-2 max-h-80 overflow-y-auto"> {savedMatches.sort((a, b) => new Date(b.lastSaved) - new Date(a.lastSaved)).map(match => ( <button key={match.id} onClick={() => loadSpecificMatch(match)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded"> <span className="font-bold">{match.homeTeamName} vs {match.opponentTeamName}</span> <span className="text-sm text-gray-400 block">{match.matchName}</span> <span className="text-sm text-gray-400 block">Last saved: {new Date(match.lastSaved).toLocaleString()}</span> </button> ))} </div> )} </div> );
@@ -1135,7 +1195,7 @@ return (
 </Modal>
 <Modal title="Error" isOpen={modal === 'not-serving-error'} onClose={() => setModal(null)}> <p>Cannot assign a serving stat when your team is not serving.</p> </Modal>
 <Modal title="Error" isOpen={modal === 'illegal-pass'} onClose={() => setModal(null)}> <p>Cannot assign a passing stat when your team is serving.</p> </Modal>
-<Modal title="Error" isOpen={modal === 'illegal-sub'} onClose={() => setModal(null)}> <p>Illegal substitution. This player cannot substitute for the selected player based on the substitution rules for this set.</p> </Modal>
+<Modal title="Error" isOpen={modal === 'illegal-sub'} onClose={() => setModal(null)}> <p>Illegal substitution. This player cannot substitute for the selected player based on the substitution rules for this set.</p> </modal>
 <Modal title="Illegal Action" isOpen={modal === 'illegal-block'} onClose={() => setModal(null)}> <p>Back row players can't get a block stat - this is Illegal.</p> </Modal>
 <Modal title="Illegal Libero Serve" isOpen={modal === 'illegal-libero-serve'} onClose={() => setModal(null)}> <p>This is an illegal serve. The libero has already served for a different player in this set.</p> </Modal>
 <Modal title="Confirm End Set" isOpen={modal === 'end-set-confirm'} onClose={() => setModal(null)}> <p className="mb-4">Are you sure you want to end the current set? The scores will be recorded and you will proceed to the next set's lineup.</p> <div className="flex justify-end space-x-4"> <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button> <button onClick={handleEndSet} className="bg-red-600 hover:bg-red-500 p-2 px-4 rounded">End Set</button> </div> </Modal>
