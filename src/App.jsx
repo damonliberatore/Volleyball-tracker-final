@@ -394,6 +394,7 @@ useEffect(() => {
         } catch (error) {
             console.error("Autosave error:", error);
             setAutoSaveStatus('Save Error!');
+            alert('Database Save Error: ${error.message}'); //add this line
         }
     }, [db, userId, matchId, matchName, homeTeamName, opponentTeamName, gameState, matchPhase, roster, lineup, liberos, liberoServingFor, liberoHasServedFor, setterId, bench, pointLog, playerStats, setStats, rotationScores, subGroups]);
 
