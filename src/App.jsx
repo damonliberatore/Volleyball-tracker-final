@@ -1,8 +1,8 @@
-// App.js - Complete Code with "Load Roster" Feature
+// App.js - Final Version
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 
 // --- Helper Components ---
 const SetterIcon = () => (
@@ -319,14 +319,11 @@ try {
   setAuth(firebaseAuth);
   onAuthStateChanged(firebaseAuth, async (user) => {
     if (user) {
+      // If a user (anonymous or otherwise) is already logged in, set their ID
       setUserId(user.uid);
     } else {
-      const authToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-      if (authToken) {
-        await signInWithCustomToken(firebaseAuth, authToken);
-      } else {
-        await signInAnonymously(firebaseAuth);
-      }
+      // If there's no user, sign them in anonymously
+      await signInAnonymously(firebaseAuth);
     }
     setIsAuthReady(true);
   });
@@ -1195,7 +1192,7 @@ return (
 </Modal>
 <Modal title="Error" isOpen={modal === 'not-serving-error'} onClose={() => setModal(null)}> <p>Cannot assign a serving stat when your team is not serving.</p> </Modal>
 <Modal title="Error" isOpen={modal === 'illegal-pass'} onClose={() => setModal(null)}> <p>Cannot assign a passing stat when your team is serving.</p> </Modal>
-<Modal title="Error" isOpen={modal === 'illegal-sub'} onClose={() => setModal(null)}> <p>Illegal substitution. This player cannot substitute for the selected player based on the substitution rules for this set.</p> </modal>
+<Modal title="Error" isOpen={modal === 'illegal-sub'} onClose={() => setModal(null)}> <p>Illegal substitution. This player cannot substitute for the selected player based on the substitution rules for this set.</p> </Modal>
 <Modal title="Illegal Action" isOpen={modal === 'illegal-block'} onClose={() => setModal(null)}> <p>Back row players can't get a block stat - this is Illegal.</p> </Modal>
 <Modal title="Illegal Libero Serve" isOpen={modal === 'illegal-libero-serve'} onClose={() => setModal(null)}> <p>This is an illegal serve. The libero has already served for a different player in this set.</p> </Modal>
 <Modal title="Confirm End Set" isOpen={modal === 'end-set-confirm'} onClose={() => setModal(null)}> <p className="mb-4">Are you sure you want to end the current set? The scores will be recorded and you will proceed to the next set's lineup.</p> <div className="flex justify-end space-x-4"> <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button> <button onClick={handleEndSet} className="bg-red-600 hover:bg-red-500 p-2 px-4 rounded">End Set</button> </div> </Modal>
