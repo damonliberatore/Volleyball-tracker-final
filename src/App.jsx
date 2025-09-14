@@ -993,39 +993,115 @@ const SeasonStatsTable = ({ statsData, rosterData }) => {
     );
 };
 
-const TabbedDisplay = () => (
-    <div className="mt-4 bg-gray-800 rounded-lg">
-    <div className="flex border-b border-gray-700 items-center flex-wrap">
-    <button onClick={() => setActiveTab('set_stats')} className={`py-2 px-4 font-bold ${activeTab === 'set_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Set Stats</button>
-    <button onClick={() => setActiveTab('receiving_stats')} className={`py-2 px-4 font-bold ${activeTab === 'receiving_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Receiving Stats</button>
-    <button onClick={() => setActiveTab('match_stats')} className={`py-2 px-4 font-bold ${activeTab === 'match_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Match Stats</button>
-    <button onClick={() => { setActiveTab('season_stats'); calculateSeasonStats(); }} className={`py-2 px-4 font-bold ${activeTab === 'season_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Season Stats</button>
-    <button onClick={() => setActiveTab('log')} className={`py-2 px-4 font-bold ${activeTab === 'log' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Point Log</button>
-    <button onClick={() => setActiveTab('rotations')} className={`py-2 px-4 font-bold ${activeTab === 'rotations' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Rotation Tracker</button>
-    </div>
-    {activeTab === 'set_stats' && <StatsTable statsData={viewingSetStats} rosterData={roster} />}
-    {activeTab === 'receiving_stats' && <ReceivingStatsTable statsData={viewingSetStats} rosterData={roster} />}
-    {activeTab === 'match_stats' && <StatsTable statsData={playerStats} rosterData={roster} />}
-    {activeTab === 'season_stats' && <SeasonStatsTable />}
-    {activeTab === 'log' && (<div className="p-3"><ul className="text-sm h-64 overflow-y-auto flex flex-col-reverse">{pointLog.map((log, i) => <li key={i} className="p-1 border-b border-gray-700">{log}</li>)}</ul></div>)}
-    {activeTab === 'rotations' && (
-    <div className="p-3">
-    <table className="w-full text-sm text-left">
-    <thead className="text-xs text-cyan-400 uppercase bg-gray-700">
-    <tr><th className="px-4 py-2">Rotation</th><th className="px-4 py-2 text-center">Home Points</th><th className="px-4 py-2 text-center">Opponent Points</th><th className="px-4 py-2 text-center">+/-</th></tr>
-    </thead>
-    <tbody>
-    {Object.keys(rotationScores).map(rNum => {
-    const s = rotationScores[rNum] || {home: 0, opponent: 0};
-    const d = s.home - s.opponent;
-    return (<tr key={rNum} className={`${d > 0 ? 'bg-green-900/50' : d < 0 ? 'bg-red-900/50' : ''} border-b border-gray-700`}><td className="px-4 py-2 font-medium">Rotation {rNum}</td><td className="px-4 py-2 text-center">{s.home}</td><td className="px-4 py-2 text-center">{s.opponent}</td><td className="px-4 py-2 text-center font-bold">{d > 0 ? `+${d}` : d}</td></tr>);
-    })}
-    </tbody>
-    </table>
-    </div>
-    )}
-    </div>
-);
+const TabbedDisplay = () => {
+
+    const setNumbers = Object.keys(allSetStats).sort((a, b) => a - b);
+
+    return (
+
+        <div className="mt-4 bg-gray-800 rounded-lg">
+
+            <div className="flex border-b border-gray-700 items-center flex-wrap">
+
+                <button onClick={() => setActiveTab('set_stats')} className={`py-2 px-4 font-bold ${activeTab === 'set_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Set Stats</button>
+
+                <button onClick={() => setActiveTab('receiving_stats')} className={`py-2 px-4 font-bold ${activeTab === 'receiving_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Receiving Stats</button>
+
+                <button onClick={() => setActiveTab('match_stats')} className={`py-2 px-4 font-bold ${activeTab === 'match_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Match Stats</button>
+
+                <button onClick={() => { setActiveTab('season_stats'); }} className={`py-2 px-4 font-bold ${activeTab === 'season_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Season Stats</button>
+
+                <button onClick={() => setActiveTab('log')} className={`py-2 px-4 font-bold ${activeTab === 'log' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Point Log</button>
+
+                <button onClick={() => setActiveTab('rotations')} className={`py-2 px-4 font-bold ${activeTab === 'rotations' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Rotation Tracker</button>
+
+            </div>
+
+
+
+            {(activeTab === 'set_stats' || activeTab === 'receiving_stats') && (
+
+                 <div className="p-3 border-b border-gray-700">
+
+                    <span className="font-bold mr-4">View Stats for:</span>
+
+                    <div className="inline-flex rounded-md shadow-sm" role="group">
+
+                        {setNumbers.map(setNum => (
+
+                            <button
+
+                                key={setNum}
+
+                                onClick={() => setViewingSet(Number(setNum))}
+
+                                type="button"
+
+                                className={`px-4 py-2 text-sm font-medium ${Number(setNum) === viewingSet ? 'bg-cyan-600 text-white' : 'bg-gray-900 hover:bg-gray-700'} border border-gray-600 first:rounded-l-lg last:rounded-r-lg`}
+
+                            >
+
+                                Set {setNum}
+
+                            </button>
+
+                        ))}
+
+                    </div>
+
+                </div>
+
+            )}
+
+
+
+            {activeTab === 'set_stats' && <StatsTable statsData={viewingSetStats} rosterData={roster} />}
+
+            {activeTab === 'receiving_stats' && <ReceivingStatsTable statsData={viewingSetStats} rosterData={roster} />}
+
+            {activeTab === 'match_stats' && <StatsTable statsData={playerStats} rosterData={roster} />}
+
+            {activeTab === 'season_stats' && <SeasonStatsTable />}
+
+            {activeTab === 'log' && (<div className="p-3"><ul className="text-sm h-64 overflow-y-auto flex flex-col-reverse">{pointLog.map((log, i) => <li key={i} className="p-1 border-b border-gray-700">{log}</li>)}</ul></div>)}
+
+            {activeTab === 'rotations' && (
+
+            <div className="p-3">
+
+            <table className="w-full text-sm text-left">
+
+            <thead className="text-xs text-cyan-400 uppercase bg-gray-700">
+
+            <tr><th className="px-4 py-2">Rotation</th><th className="px-4 py-2 text-center">Home Points</th><th className="px-4 py-2 text-center">Opponent Points</th><th className="px-4 py-2 text-center">+/-</th></tr>
+
+            </thead>
+
+            <tbody>
+
+            {Object.keys(rotationScores).map(rNum => {
+
+            const s = rotationScores[rNum] || {home: 0, opponent: 0};
+
+            const d = s.home - s.opponent;
+
+            return (<tr key={rNum} className={`${d > 0 ? 'bg-green-900/50' : d < 0 ? 'bg-red-900/50' : ''} border-b border-gray-700`}><td className="px-4 py-2 font-medium">Rotation {rNum}</td><td className="px-4 py-2 text-center">{s.home}</td><td className="px-4 py-2 text-center">{s.opponent}</td><td className="px-4 py-2 text-center font-bold">{d > 0 ? `+${d}` : d}</td></tr>);
+
+            })}
+
+            </tbody>
+
+            </table>
+
+            </div>
+
+            )}
+
+        </div>
+
+    );
+
+};
 
 const LineupSetup = () => {
     const [tempLiberos, setTempLiberos] = useState(new Set());
@@ -1120,7 +1196,49 @@ const RosterModal = () => {
     );
 };
 
-const LoadMatchModal = () => ( <div> {savedMatches.length === 0 ? <p>No saved matches found.</p> : ( <div className="space-y-2 max-h-80 overflow-y-auto"> {savedMatches.sort((a, b) => new Date(b.lastSaved) - new Date(a.lastSaved)).map(match => ( <button key={match.id} onClick={() => loadSpecificMatch(match)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded"> <span className="font-bold">{match.homeTeamName} vs {match.opponentTeamName}</span> <span className="text-sm text-gray-400 block">{match.matchName}</span> <span className="text-sm text-gray-400 block">Last saved: {new Date(match.lastSaved).toLocaleString()}</span> </button> ))} </div> )} </div> );
+const LoadMatchModal = () => (
+
+    <div>
+
+        {savedMatches.length === 0 ? <p>No saved matches found.</p> : (
+
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+
+                {savedMatches.sort((a, b) => new Date(b.lastSaved) - new Date(a.lastSaved)).map(match => (
+
+                    <div key={match.id} className="flex items-center space-x-2">
+
+                        <button onClick={() => loadSpecificMatch(match)} className="flex-grow text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">
+
+                            <span className="font-bold">{match.homeTeamName} vs {match.opponentTeamName}</span>
+
+                            <span className="text-sm text-gray-400 block">{match.matchName || 'Untitled Match'}</span>
+
+                            <span className="text-sm text-gray-400 block">Last saved: {new Date(match.lastSaved).toLocaleString()}</span>
+
+                        </button>
+
+                        <button onClick={() => promptDeleteMatch(match.id)} className="p-3 bg-red-800 hover:bg-red-700 rounded h-full">
+
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+
+                                <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.58.22-2.365.468a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.023 2.5.067V3.75a1.25 1.25 0 10-2.5 0V4z" clipRule="evenodd" />
+
+                            </svg>
+
+                        </button>
+
+                    </div>
+
+                ))}
+
+            </div>
+
+        )}
+
+    </div>
+
+);
 
 const LineupPlayerSelectModal = () => { const lineupPlayerIds = Object.values(lineup).filter(Boolean); const availablePlayers = roster.filter(p => !lineupPlayerIds.includes(p.id));
     return (<div><p className="mb-4">Select a player for position <span className="font-bold text-cyan-400">{subTarget.position?.toUpperCase()}</span></p><div className="space-y-2 max-h-80 overflow-y-auto">{availablePlayers.map(player => (<button key={player.id} onClick={() => handlePlayerSelectForLineup(player.id)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">#{player.number} {player.name}</button>))}</div></div>);
@@ -1260,3 +1378,49 @@ return (
 </div>
 );
 }
+const promptDeleteMatch = (matchId) => {
+
+    setItemToDelete(matchId);
+
+    setModal('confirm-delete-match');
+
+};
+
+
+
+const handleDeleteMatch = async () => {
+
+    if (!itemToDelete) return;
+
+    try {
+
+        await deleteDoc(doc(getMatchCollectionRef(), itemToDelete));
+
+        setSavedMatches(prev => prev.filter(match => match.id !== itemToDelete));
+
+        setItemToDelete(null);
+
+        setModal(null);
+
+    } catch (error) {
+
+        console.error("Error deleting match:", error);
+
+        alert("Could not delete match.");
+
+    }
+
+};
+<Modal title="Confirm Deletion" isOpen={modal === 'confirm-delete-match'} onClose={() => setModal(null)}>
+
+    <p className="mb-4">Are you sure you want to permanently delete this match and all of its stats?</p>
+
+    <div className="flex justify-end space-x-4">
+
+        <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button>
+
+        <button onClick={handleDeleteMatch} className="bg-red-600 hover:bg-red-500 p-2 px-4 rounded">Delete Match</button>
+
+    </div>
+
+</Modal>
