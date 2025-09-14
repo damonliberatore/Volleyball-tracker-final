@@ -1374,6 +1374,19 @@ return (
         <button onClick={handleEndMatch} className="bg-red-600 hover:bg-red-500 p-2 px-4 rounded">End Match</button>
     </div>
 </Modal>
+<Modal title="Confirm Deletion" isOpen={modal === 'confirm-delete-match'} onClose={() => setModal(null)}>
+
+    <p className="mb-4">Are you sure you want to permanently delete this match and all of its stats?</p>
+
+    <div className="flex justify-end space-x-4">
+
+        <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button>
+
+        <button onClick={handleDeleteMatch} className="bg-red-600 hover:bg-red-500 p-2 px-4 rounded">Delete Match</button>
+
+    </div>
+
+</Modal>
 </div>
 </div>
 );
@@ -1411,16 +1424,3 @@ const handleDeleteMatch = async () => {
     }
 
 };
-<Modal title="Confirm Deletion" isOpen={modal === 'confirm-delete-match'} onClose={() => setModal(null)}>
-
-    <p className="mb-4">Are you sure you want to permanently delete this match and all of its stats?</p>
-
-    <div className="flex justify-end space-x-4">
-
-        <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button>
-
-        <button onClick={handleDeleteMatch} className="bg-red-600 hover:bg-red-500 p-2 px-4 rounded">Delete Match</button>
-
-    </div>
-
-</Modal>
