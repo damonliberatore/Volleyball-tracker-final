@@ -1,4 +1,4 @@
-// App.js - Batch 1 of 4
+// App.js - Final Version with Season Stats Fix
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, orderBy, limit, deleteDoc } from 'firebase/firestore';
@@ -315,6 +315,45 @@ clearTimeout(autoSaveTimeoutRef.current);
 }
 };
 }, [gameState, lineup, allSetStats, pointLog, bench, setterId, liberos, liberoServingFor, liberoHasServedFor, currentServerId, matchPhase, matchId, autoSaveMatchToFirebase]);
+
+const calculateSeasonStats = async () => {
+    if (!getMatchCollectionRef()) return;
+    try {
+        const querySnapshot = await getDocs(getMatchCollectionRef());
+        const allMatches = querySnapshot.docs.map(doc => doc.data());
+
+        const compiledStats = {};
+        const allPlayers = [];
+
+        allMatches.forEach(match => {
+            if (match.roster && Array.isArray(match.roster)) {
+                match.roster.forEach(player => {
+                    if (!allPlayers.some(p => p.number === player.number)) {
+                        allPlayers.push(player);
+                    }
+                });
+            }
+
+            if (match.playerStats) {
+                for (const playerId in match.playerStats) {
+                    if (!compiledStats[playerId]) {
+                        const playerInfo = match.roster ? match.roster.find(p => p.id === playerId) : null;
+                        compiledStats[playerId] = {
+                            ...(playerInfo || { id: playerId, name: 'Unknown', number: '?' }),
+                            stats: {}
+                        };
+                    }
+                    for (const stat in match.playerStats[playerId]) {
+                        compiledStats[playerId].stats[stat] = (compiledStats[playerId].stats[stat] || 0) + match.playerStats[playerId][stat];
+                    }
+                }
+            }
+        });
+        setSeasonStats({ players: allPlayers, stats: compiledStats });
+    } catch (error) {
+        console.error("Error calculating season stats:", error);
+    }
+};
 
 const saveMatchToFirebase = async () => {
 if (autoSaveTimeoutRef.current) {
@@ -1011,8 +1050,6 @@ const SeasonStatsTable = () => {
     );
 };
 
-// App.js - Batch 1 of 1: Corrected TabbedDisplay Component
-
 const TabbedDisplay = () => {
     const setNumbers = Object.keys(allSetStats).sort((a, b) => a - b);
     return (
@@ -1021,7 +1058,6 @@ const TabbedDisplay = () => {
                 <button onClick={() => setActiveTab('set_stats')} className={`py-2 px-4 font-bold ${activeTab === 'set_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Set Stats</button>
                 <button onClick={() => setActiveTab('receiving_stats')} className={`py-2 px-4 font-bold ${activeTab === 'receiving_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Receiving Stats</button>
                 <button onClick={() => setActiveTab('match_stats')} className={`py-2 px-4 font-bold ${activeTab === 'match_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Match Stats</button>
-                {/* --- THIS IS THE FIX --- */}
                 <button onClick={() => { setActiveTab('season_stats'); calculateSeasonStats(); }} className={`py-2 px-4 font-bold ${activeTab === 'season_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Season Stats</button>
                 <button onClick={() => setActiveTab('log')} className={`py-2 px-4 font-bold ${activeTab === 'log' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Point Log</button>
                 <button onClick={() => setActiveTab('rotations')} className={`py-2 px-4 font-bold ${activeTab === 'rotations' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Rotation Tracker</button>
@@ -1069,6 +1105,8 @@ const TabbedDisplay = () => {
         </div>
     );
 };
+
+// ... (The rest of the component definitions will be in the next batch)
 
 // App.js - Batch 4 of 4
 
