@@ -1013,119 +1013,63 @@ const SeasonStatsTable = () => {
 
 // App.js - Batch 1 of 1: Corrected TabbedDisplay Component
 
-
-
 const TabbedDisplay = () => {
-
     const setNumbers = Object.keys(allSetStats).sort((a, b) => a - b);
-
     return (
-
         <div className="mt-4 bg-gray-800 rounded-lg">
-
             <div className="flex border-b border-gray-700 items-center flex-wrap">
-
                 <button onClick={() => setActiveTab('set_stats')} className={`py-2 px-4 font-bold ${activeTab === 'set_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Set Stats</button>
-
                 <button onClick={() => setActiveTab('receiving_stats')} className={`py-2 px-4 font-bold ${activeTab === 'receiving_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Receiving Stats</button>
-
                 <button onClick={() => setActiveTab('match_stats')} className={`py-2 px-4 font-bold ${activeTab === 'match_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Match Stats</button>
-
                 {/* --- THIS IS THE FIX --- */}
-
                 <button onClick={() => { setActiveTab('season_stats'); calculateSeasonStats(); }} className={`py-2 px-4 font-bold ${activeTab === 'season_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Season Stats</button>
-
                 <button onClick={() => setActiveTab('log')} className={`py-2 px-4 font-bold ${activeTab === 'log' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Point Log</button>
-
                 <button onClick={() => setActiveTab('rotations')} className={`py-2 px-4 font-bold ${activeTab === 'rotations' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Rotation Tracker</button>
-
             </div>
-
-
 
             {(activeTab === 'set_stats' || activeTab === 'receiving_stats') && setNumbers.length > 0 && (
-
                  <div className="p-3 border-b border-gray-700">
-
                     <span className="font-bold mr-4">View Stats for:</span>
-
                     <div className="inline-flex rounded-md shadow-sm" role="group">
-
                         {setNumbers.map(setNum => (
-
                             <button
-
                                 key={setNum}
-
                                 onClick={() => setViewingSet(Number(setNum))}
-
                                 type="button"
-
                                 className={`px-4 py-2 text-sm font-medium ${Number(setNum) === viewingSet ? 'bg-cyan-600 text-white' : 'bg-gray-900 hover:bg-gray-700'} border border-gray-600 first:rounded-l-lg last:rounded-r-lg`}
-
                             >
-
                                 Set {setNum}
-
                             </button>
-
                         ))}
-
                     </div>
-
                 </div>
-
             )}
-
-
 
             {activeTab === 'set_stats' && <StatsTable statsData={viewingSetStats} rosterData={roster} />}
-
             {activeTab === 'receiving_stats' && <ReceivingStatsTable statsData={viewingSetStats} rosterData={roster} />}
-
             {activeTab === 'match_stats' && <StatsTable statsData={playerStats} rosterData={roster} />}
-
             {activeTab === 'season_stats' && <SeasonStatsTable />}
-
             {activeTab === 'log' && (<div className="p-3"><ul className="text-sm h-64 overflow-y-auto flex flex-col-reverse">{pointLog.map((log, i) => <li key={i} className="p-1 border-b border-gray-700">{log}</li>)}</ul></div>)}
-
             {activeTab === 'rotations' && (
-
             <div className="p-3">
-
             <table className="w-full text-sm text-left">
-
             <thead className="text-xs text-cyan-400 uppercase bg-gray-700">
-
             <tr><th className="px-4 py-2">Rotation</th><th className="px-4 py-2 text-center">Home Points</th><th className="px-4 py-2 text-center">Opponent Points</th><th className="px-4 py-2 text-center">+/-</th></tr>
-
             </thead>
-
             <tbody>
-
             {Object.keys(rotationScores).map(rNum => {
-
             const s = rotationScores[rNum] || {home: 0, opponent: 0};
-
             const d = s.home - s.opponent;
-
             return (<tr key={rNum} className={`${d > 0 ? 'bg-green-900/50' : d < 0 ? 'bg-red-900/50' : ''} border-b border-gray-700`}><td className="px-4 py-2 font-medium">Rotation {rNum}</td><td className="px-4 py-2 text-center">{s.home}</td><td className="px-4 py-2 text-center">{s.opponent}</td><td className="px-4 py-2 text-center font-bold">{d > 0 ? `+${d}` : d}</td></tr>);
-
             })}
-
             </tbody>
-
             </table>
-
             </div>
-
             )}
-
         </div>
-
     );
-
 };
+
 // App.js - Batch 4 of 4
 
 const LineupSetup = () => {
