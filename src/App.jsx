@@ -316,43 +316,107 @@ clearTimeout(autoSaveTimeoutRef.current);
 };
 }, [gameState, lineup, allSetStats, pointLog, bench, setterId, liberos, liberoServingFor, liberoHasServedFor, currentServerId, matchPhase, matchId, autoSaveMatchToFirebase]);
 
+// App.js - Batch 1 of 2: Corrected calculateSeasonStats function
+
 const calculateSeasonStats = async () => {
     if (!getMatchCollectionRef()) return;
     try {
         const querySnapshot = await getDocs(getMatchCollectionRef());
         const allMatches = querySnapshot.docs.map(doc => doc.data());
 
-        const compiledStats = {};
-        const allPlayers = [];
+        const compiledData = {}; // We will use the player's NUMBER as the key
 
         allMatches.forEach(match => {
-            if (match.roster && Array.isArray(match.roster)) {
-                match.roster.forEach(player => {
-                    if (!allPlayers.some(p => p.number === player.number)) {
-                        allPlayers.push(player);
-                    }
-                });
-            }
+            // Skip any match that doesn't have the necessary data
+            if (!match.roster || !match.playerStats) return;
 
-            if (match.playerStats) {
-                for (const playerId in match.playerStats) {
-                    if (!compiledStats[playerId]) {
-                        const playerInfo = match.roster ? match.roster.find(p => p.id === playerId) : null;
-                        compiledStats[playerId] = {
-                            ...(playerInfo || { id: playerId, name: 'Unknown', number: '?' }),
-                            stats: {}
-                        };
-                    }
-                    for (const stat in match.playerStats[playerId]) {
-                        compiledStats[playerId].stats[stat] = (compiledStats[playerId].stats[stat] || 0) + match.playerStats[playerId][stat];
+            // Go through each player in this match's roster
+            match.roster.forEach(player => {
+                const key = player.number; // The player's number is the consistent ID
+                
+                // If we haven't seen this player number before, create an entry for them
+                if (!compiledData[key]) {
+                    compiledData[key] = {
+                        name: player.name,
+                        number: player.number,
+                        // We also need a stats object for them
+                        stats: {}
+                    };
+                }
+
+                // Get the stats for this player from this specific match using their temporary match ID
+                const matchPlayerStats = match.playerStats[player.id];
+                if (matchPlayerStats) {
+                    for (const stat in matchPlayerStats) {
+                        // Add this match's stat to the player's running season total
+                        compiledData[key].stats[stat] = (compiledData[key].stats[stat] || 0) + matchPlayerStats[stat];
                     }
                 }
-            }
+            });
         });
-        setSeasonStats({ players: allPlayers, stats: compiledStats });
+        
+        // Save the newly compiled data to the state
+        setSeasonStats(compiledData);
+
     } catch (error) {
         console.error("Error calculating season stats:", error);
     }
+};
+
+// App.js - Batch 2 of 2: Corrected SeasonStatsTable Component
+
+const SeasonStatsTable = () => {
+    // The seasonStats object is now the complete source of data
+    const playersToDisplay = Object.values(seasonStats).sort((a, b) => a.number - b.number);
+
+    const STAT_ORDER = ['Serve Attempt', 'Ace', 'Serve Error', 'Hit Attempt', 'Kill', 'Hit Error', 'Set Attempt', 'Assist', 'Set Error', 'Block', 'Block Error', 'Dig', 'Reception Attempt', 'Reception Score', 'RE'];
+    
+    const calculateHittingPercentage = (stats) => {
+        if (!stats) return '.000';
+        const kills = stats['Kill'] || 0;
+        const errors = stats['Hit Error'] || 0;
+        const attempts = stats['Hit Attempt'] || 0;
+        if (attempts === 0) return '.000';
+        return ((kills - errors) / attempts).toFixed(3);
+    };
+
+    const teamTotals = STAT_ORDER.reduce((acc, stat) => {
+        acc[stat] = playersToDisplay.reduce((total, playerData) => total + (playerData.stats[stat] || 0), 0);
+        return acc;
+    }, {});
+
+    return (
+        <div className="p-3 overflow-x-auto">
+            <table className="w-full text-sm text-left">
+                <thead className="text-xs text-cyan-400 uppercase bg-gray-700">
+                    <tr>
+                        <th className="px-4 py-2">Player</th>
+                        {STAT_ORDER.map(stat => <th key={stat} className="px-2 py-2 text-center">{stat.replace('Attempt', 'Att').replace('Error', 'Err').replace('Reception', 'Rec')}</th>)}
+                        <th className="px-2 py-2 text-center">Hit %</th>
+                        <th className="px-2 py-2 text-center">VBRT</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {playersToDisplay.map(playerData => (
+                        <tr key={playerData.number} className="border-b border-gray-700">
+                            <td className="px-4 py-2 font-medium whitespace-nowrap">#{playerData.number} {playerData.name}</td>
+                            {STAT_ORDER.map(stat => <td key={stat} className="px-2 py-2 text-center">{playerData.stats[stat] || 0}</td>)}
+                            <td className="px-2 py-2 text-center">{calculateHittingPercentage(playerData.stats)}</td>
+                            <td className="px-2 py-2 text-center font-bold">{calculateVbrt(playerData.stats)}</td>
+                        </tr>
+                    ))}
+                </tbody>
+                <tfoot>
+                    <tr className="font-bold text-cyan-400 bg-gray-700">
+                        <td className="px-4 py-2">TEAM TOTAL</td>
+                        {STAT_ORDER.map(stat => <td key={stat} className="px-2 py-2 text-center">{teamTotals[stat] || 0}</td>)}
+                        <td className="px-2 py-2 text-center">{calculateHittingPercentage(teamTotals)}</td>
+                        <td className="px-2 py-2 text-center font-bold">{calculateVbrt(teamTotals)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    );
 };
 
 const saveMatchToFirebase = async () => {
