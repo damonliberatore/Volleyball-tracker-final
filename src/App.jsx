@@ -1223,10 +1223,52 @@ const LineupPlayerSelectModal = () => { const lineupPlayerIds = Object.values(li
 
 const SelectServerModal = () => (<div><p className="mb-4 font-bold">Who is serving first?</p><div className="flex justify-around"><button onClick={() => handleStartSet('home')} className="bg-cyan-600 hover:bg-cyan-500 p-3 rounded-lg w-32 font-bold">Home</button><button onClick={() => handleStartSet('opponent')} className="bg-red-600 hover:bg-red-500 p-3 rounded-lg w-32 font-bold">Opponent</button></div></div>);
 
-const SubstituteModal = () => (<div><p className="mb-4">Select a player from the bench to substitute in.</p><div className="space-y-2 max-h-80 overflow-y-auto">{bench.map(player => (<button key={player.id} onClick={() => executeSubstitution(player.id)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">#{player.number} {player.name}</button>))}</div></div>);
+const SubstituteModal = () => (
+    <div>
+        <p className="mb-4">Select a player from the bench to substitute in.</p>
+        <div className="grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+            {bench.map(player => (
+                <button 
+                    key={player.id} 
+                    onClick={() => executeSubstitution(player.id)} 
+                    className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded"
+                >
+                    #{player.number} {player.name}
+                </button>
+            ))}
+        </div>
+    </div>
+);
 
-const AssignStatModal = () => { const onCourtIds = [...Object.values(lineup), ...liberos].filter(Boolean); const onCourtPlayers = roster.filter(p => onCourtIds.includes(p.id));
-    return (<div><p className="mb-4">Assign <span className="font-bold text-cyan-400">{statToAssign}</span> to:</p><div className="space-y-2 max-h-80 overflow-y-auto">{onCourtPlayers.map(player => (<button key={player.id} onClick={() => assignStatToPlayer(player.id)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">#{player.number} {player.name}</button>))}</div></div>);
+const AssignStatModal = () => {
+    const courtOrder = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'];
+    const sortedOnCourtPlayers = courtOrder
+        .map(pos => lineup[pos])
+        .filter(Boolean)
+        .map(playerId => roster.find(p => p.id === playerId));
+    
+    const liberoPlayers = liberos
+        .map(liberoId => roster.find(p => p.id === liberoId))
+        .filter(Boolean);
+
+    const onCourtPlayers = [...sortedOnCourtPlayers, ...liberoPlayers];
+
+    return (
+        <div>
+            <p className="mb-4">Assign <span className="font-bold text-cyan-400">{statToAssign}</span> to:</p>
+            <div className="grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+                {onCourtPlayers.map(player => (
+                    <button 
+                        key={player.id} 
+                        onClick={() => assignStatToPlayer(player.id)} 
+                        className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded"
+                    >
+                        #{player.number} {player.name}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
 };
 
 const AssignKwdaAssistModal = () => { const onCourtIds = [...Object.values(lineup), ...liberos].filter(Boolean);
