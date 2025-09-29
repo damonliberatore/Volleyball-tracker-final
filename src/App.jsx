@@ -1,4 +1,4 @@
-// App.js - Batch 1 of 2 (Team Management Feature)
+// App.js - Batch 1 of 2 (Definitive Fix)
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, orderBy, limit, deleteDoc } from 'firebase/firestore';
@@ -106,7 +106,6 @@ const [savedMatches, setSavedMatches] = useState([]);
 const [autoSaveStatus, setAutoSaveStatus] = useState('Saved  ✓ ');
 const [viewingSet, setViewingSet] = useState(1);
 const [itemToDelete, setItemToDelete] = useState(null);
-const [teams, setTeams] = useState([]);
 // Firebase state
 const [db, setDb] = useState(null);
 const [auth, setAuth] = useState(null);
@@ -242,7 +241,6 @@ leaderReceiveAttempts = currentAttempts;
 leaders.receivePct = receivePctLeader;
 return leaders;
 }, [allSetStats, viewingSet, pointLog, roster]);
-// App.js - Batch 2 of 4 (Team Management Feature)
 
 // --- Firebase Initialization & Auth ---
 useEffect(() => {
@@ -282,12 +280,6 @@ const getMatchCollectionRef = useCallback(() => {
 if (!db || !userId) return null;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 return collection(db, 'artifacts', appId, 'users', userId, 'matches');
-}, [db, userId]);
-
-const getTeamsCollectionRef = useCallback(() => {
-if (!db || !userId) return null;
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-return collection(db, 'artifacts', appId, 'users', userId, 'teams');
 }, [db, userId]);
 
 const autoSaveMatchToFirebase = useCallback(async () => {
@@ -386,6 +378,22 @@ setCurrentServerId(matchData.lineup?.p1 || null);
 setViewingSet(matchData.gameState.currentSet);
 };
 
+const loadMostRecentRoster = async () => {
+  if (!getMatchCollectionRef()) return null;
+  const q = query(getMatchCollectionRef(), orderBy("lastSaved", "desc"), limit(1));
+  try {
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      const lastMatch = querySnapshot.docs[0].data();
+      return lastMatch.roster;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error loading most recent roster:", error);
+    return null;
+  }
+};
+
 const promptDeleteMatch = (matchId) => {
     setItemToDelete({id: matchId, type: 'match'});
     setModal('confirm-delete');
@@ -404,48 +412,6 @@ const handleDeleteMatch = async () => {
     }
 };
 
-// --- Team Management Logic ---
-const loadTeams = async () => {
-    if (!getTeamsCollectionRef()) return;
-    try {
-        const querySnapshot = await getDocs(getTeamsCollectionRef());
-        const loadedTeams = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setTeams(loadedTeams);
-    } catch (error) {
-        console.error("Error loading teams:", error);
-    }
-};
-
-const saveTeam = async (teamData) => {
-    const teamRef = teamData.id ? doc(getTeamsCollectionRef(), teamData.id) : doc(getTeamsCollectionRef());
-    try {
-        await setDoc(teamRef, { name: teamData.name, roster: teamData.roster }, { merge: true });
-        loadTeams(); // Refresh the list of teams
-    } catch (error) {
-        console.error("Error saving team:", error);
-        alert("Could not save team.");
-    }
-};
-
-const promptDeleteTeam = (teamId) => {
-    setItemToDelete({id: teamId, type: 'team'});
-    setModal('confirm-delete');
-};
-
-const handleDeleteTeam = async () => {
-    if (!itemToDelete || itemToDelete.type !== 'team') return;
-    try {
-        await deleteDoc(doc(getTeamsCollectionRef(), itemToDelete.id));
-        setItemToDelete(null);
-        setModal(null);
-        loadTeams(); // Refresh the list of teams
-    } catch (error) {
-        console.error("Error deleting team:", error);
-        alert("Could not delete team.");
-    }
-};
-
-
 // --- Undo and History Logic ---
 const saveToHistory = () => {
 const snapshot = { gameState: JSON.parse(JSON.stringify(gameState)), lineup: JSON.parse(JSON.stringify(lineup)), playerStats: JSON.parse(JSON.stringify(playerStats)), allSetStats: JSON.parse(JSON.stringify(allSetStats)), pointLog: JSON.parse(JSON.stringify(pointLog)), bench: JSON.parse(JSON.stringify(bench)), rotationScores: JSON.parse(JSON.stringify(rotationScores)), setterId: setterId, currentServerId: currentServerId, liberoHasServedFor: liberoHasServedFor };
@@ -460,10 +426,7 @@ setHistory(prev => prev.slice(0, -1));
 };
 
 // --- Game Logic Functions ---
-const handleStartNewMatch = () => {
-    loadTeams();
-    setModal('roster');
-};
+const handleStartNewMatch = () => setModal('roster');
 
 const handleSaveRoster = (newRoster, name, homeName, oppName) => {
 const newMatchId = crypto.randomUUID();
@@ -795,336 +758,765 @@ const handleSetLiberoServe = (playerId) => {
   setLiberoServingFor(playerId);
   setModal(null);
 };
-// App.js - Batch 3 of 4 (Team Management Feature)
+    // App.js - Final and Complete Version
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, orderBy, limit, deleteDoc } from 'firebase/firestore';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 
-// --- UI Components (Defined inside App) ---
-
-const Modal = ({ title, children, isOpen, onClose }) => {
-    if (!isOpen) return null;
-    return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-    <div className="bg-gray-800 text-white rounded-lg shadow-2xl p-6 w-full max-w-md md:max-w-lg mx-4">
-    <div className="flex justify-between items-center mb-4">
-    <h2 className="text-2xl font-bold text-cyan-400">{title}</h2>
-    <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
-    </div>
-    <div>{children}</div>
-    </div>
-    </div>
-    );
-};
-
-const PlayerCard = ({ player, isSetter, onClick, isTarget, isSelected, statLeaders = {}, playerSetStats }) => {
-    let nameColorClass = 'text-white';
-    if (player && playerSetStats) {
-    const vbrt = parseFloat(calculateVbrt(playerSetStats));
-    if (vbrt >= 2.0) {
-    nameColorClass = 'text-green-400';
-    } else if (vbrt < -2.0) {
-    nameColorClass = 'text-red-400';
-    } else if (vbrt < -1.0) {
-    nameColorClass = 'text-yellow-400';
-    }
-    }
-    return (
-    <div
-    onClick={onClick}
-    className={`relative bg-gray-700 text-white p-2 rounded-lg shadow-md text-center cursor-pointer hover:bg-gray-600 transition-colors duration-200 h-20 flex flex-col justify-center ${isTarget ? 'ring-2 ring-cyan-400' : ''} ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
-    >
-    {player ? (
-    <>
-    {statLeaders.dig === player.id && <DigLeaderIcon />}
-    {isSetter && <SetterIcon />}
-    {statLeaders.re === player.id && <RELeaderIcon />}
-    {statLeaders.hitPct === player.id && <HittingPercentageLeaderIcon />}
-    {statLeaders.receivePct === player.id && <ReceivingLeaderIcon />}
-    <span className={`text-4xl font-bold ${nameColorClass}`}>#{player.number}</span>
-    <span className={`text-lg truncate font-bold ${nameColorClass}`}>{player.name}</span>
-    {statLeaders.ace === player.id && <AceLeaderIcon />}
-    {statLeaders.kill === player.id && <KillLeaderIcon />}
-    {statLeaders.receiveAtt === player.id && <ReceptionLeaderIcon />}
-    </>
-    ) : (
-    <span className="text-gray-400">Empty</span>
-    )}
-    </div>
-    );
-};
-
-const renderCourt = (isSetupMode = false) => {
-    const courtOrder = ['p4', 'p3', 'p2', 'p5', 'p6', 'p1'];
-    return courtOrder.map(pos => {
-    const playerId = lineup[pos];
-    const player = roster.find(p => p.id === playerId);
-    return ( <PlayerCard key={pos} player={player} isSetter={playerId === setterId} onClick={() => isSetupMode ? handleCourtClickForLineup(pos) : handleSubClick(pos, playerId)} statLeaders={statLeaders} playerSetStats={viewingSetStats[playerId]} /> );
-    });
-};
-
-const Scoreboard = ({ earnedPoints }) => {
-    let rotationColorClass = 'text-white';
-    const currentRotation = gameState.rotation;
-    const currentRotationScore = rotationScores[currentRotation];
-    if (currentRotationScore) {
-    const diff = currentRotationScore.home - currentRotationScore.opponent;
-    if (diff > 0) rotationColorClass = 'text-green-400';
-    else if (diff < 0) rotationColorClass = 'text-red-400';
-    }
-    return (
-    <div className="bg-gray-900 p-2 rounded-lg shadow-lg flex justify-around items-start text-white mb-1">
-    <div className="flex flex-col items-center flex-1">
-    <div className="text-center">
-    <div className="text-base text-cyan-400 uppercase">{homeTeamName}</div>
-    <div className="text-4xl font-bold">{gameState.homeScore}</div>
-    <div className="text-sm">Sets: {gameState.homeSetsWon}</div>
-    <div className="text-xs mt-1">Earned: {earnedPoints.earned} | Unearned: {earnedPoints.unearned}</div>
-    </div>
-    <div className="mt-1 flex flex-col items-center w-full">
-    <h2 className="text-xs font-bold text-cyan-400 mb-1 uppercase">Liberos</h2>
-    <div className="flex space-x-1 justify-center">
-    {liberos.length > 0 ? liberos.map(liberoId => (
-    <div className="w-24" key={liberoId}>
-    <PlayerCard player={roster.find(p => p.id === liberoId)} isSetter={false} statLeaders={statLeaders} playerSetStats={viewingSetStats[liberoId]} />
-    </div>
-    )) : <div className="text-xs text-gray-500 h-20 flex items-center">None</div>}
-    </div>
-    </div>
-    </div>
-    <div className="text-center px-2 flex-1 mt-2">
-    <div className="text-sm">SET {gameState.currentSet}</div>
-    <div className={`text-lg font-bold ${rotationColorClass}`}>Rotation {gameState.rotation}</div>
-    <div className={`text-xs p-1 rounded mt-1 ${gameState.servingTeam === 'home' ? 'bg-green-500' : 'bg-gray-600'}`}>HOME SERVE</div>
-    <div className={`text-xs p-1 rounded mt-1 ${gameState.servingTeam === 'opponent' ? 'bg-green-500' : 'bg-gray-600'}`}>OPP SERVE</div>
-    <div className="text-sm mt-1">SUBS: {gameState.homeSubs}</div>
-    </div>
-    <div className="text-center flex-1">
-    <div className="text-base text-red-400 uppercase">{opponentTeamName}</div>
-    <div className="text-4xl font-bold">{gameState.opponentScore}</div>
-    <div className="text-sm">Sets: {gameState.opponentSetsWon}</div>
-    </div>
-    </div>
-    );
-};
-
-const StatButton = ({ label, onClick, type }) => { const colors = { positive: 'bg-green-600 hover:bg-green-500', neutral: 'bg-blue-600 hover:bg-blue-500', negative: 'bg-red-600 hover:bg-red-500' };
-    return (<button onClick={onClick} className={`text-white font-bold py-2 px-1 rounded-lg shadow-md transition-transform transform hover:scale-105 text-sm ${colors[type]}`}>{label}</button>); };
-
-const StatPanel = ({ handleUndo, history }) => (
-    <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mt-2">
-    <div className="bg-gray-800 p-2 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2 text-sm">SERVING</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Ace" onClick={() => handleStatClick('Ace')} type="positive" /><StatButton label="Serve Error" onClick={() => handleStatClick('Serve Error')} type="negative" /></div></div>
-    <div className="bg-gray-800 p-2 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2 text-sm">HITTING</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Kill" onClick={() => handleStatClick('Kill')} type="positive" />{setterId !== null && <StatButton label="KWDA" onClick={() => handleStatClick('KWDA')} type="positive" />}<StatButton label="Hit Attempt" onClick={() => handleStatClick('Hit Attempt')} type="neutral" /><StatButton label="Hit Error" onClick={() => handleStatClick('Hit Error')} type="negative" /></div></div>
-    <div className="bg-gray-800 p-2 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2 text-sm">PASSING</h3><div className="grid grid-cols-1 gap-2"><StatButton label="3-Pass" onClick={() => handleStatClick('3-Pass')} type="neutral" /><StatButton label="2-Pass" onClick={() => handleStatClick('2-Pass')} type="neutral" /><StatButton label="1-Pass" onClick={() => handleStatClick('1-Pass')} type="neutral" /><StatButton label="RE" onClick={() => handleStatClick('RE')} type="negative" /></div></div>
-    <div className="bg-gray-800 p-2 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2 text-sm">SETTING</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Assist" onClick={() => handleStatClick('Assist')} type="neutral" /><StatButton label="Set Error" onClick={() => handleStatClick('Set Error')} type="negative" /></div></div>
-    <div className="bg-gray-800 p-2 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2 text-sm">DEFENSE</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Dig" onClick={() => handleStatClick('Dig')} type="neutral" /><StatButton label="Block" onClick={() => handleStatClick('Block')} type="positive" /><StatButton label="Block Error" onClick={() => handleStatClick('Block Error')} type="negative" /></div></div>
-    <div className="bg-gray-800 p-2 rounded-lg"><h3 className="text-cyan-400 font-bold text-center mb-2 text-sm">GAME</h3><div className="grid grid-cols-1 gap-2"><StatButton label="Opponent Error" onClick={() => handleStatClick('Opponent Error')} type="positive" /><StatButton label="Opponent Point" onClick={() => handleStatClick('Opponent Point')} type="negative" /><button onClick={handleUndo} disabled={history.length === 0} className="w-full mt-2 py-2 px-4 font-bold bg-yellow-600 hover:bg-yellow-500 rounded-lg text-sm text-white disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed">Undo</button></div></div>
-    </div>
+// --- Helper Components (Stateless) ---
+const SetterIcon = () => (
+<span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center z-10">S</span>
+);
+const AceLeaderIcon = () => (
+<span className="absolute bottom-0.5 left-0.5 bg-green-500 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center z-10">A</span>
+);
+const KillLeaderIcon = () => (
+<span className="absolute bottom-0.5 right-0.5 bg-orange-500 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center z-10">K</span>
+);
+const DigLeaderIcon = () => (
+<span className="absolute top-0.5 left-0.5 bg-yellow-500 text-black p-0.5 rounded-full h-5 w-5 flex items-center justify-center z-10" title="Dig Leader">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+<path d="M14.25 21.75a.75.75 0 01.75-.75h4.5a.75.75 0 010 1.5h-4.5a.75.75 0 01-.75-.75zM16.5 6.31L12.44 2.25a.75.75 0 00-1.06 0L7.5 6.19a.75.75 0 001.06 1.06L11.25 4.5v11.25a.75.75 0 001.5 0V4.5l2.69 2.69a.75.75 0 001.06-1.06z" />
+</svg>
+</span>
+);
+const RELeaderIcon = () => (
+<span className="absolute top-1/2 -translate-y-1/2 right-0.5 h-5 w-5 flex items-center justify-center z-10" title="Most Reception Errors">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="red" strokeWidth="2" className="w-5 h-5">
+<circle cx="12" cy="12" r="10" />
+<circle cx="12" cy="12" r="6" />
+<circle cx="12" cy="12" r="2" fill="red" stroke="none" />
+</svg>
+</span>
+);
+const HittingPercentageLeaderIcon = () => (
+<span className="absolute top-1/2 -translate-y-1/2 left-0.5 bg-white text-black text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center z-10" title="Highest Hitting %">%</span>
+);
+const ReceivingLeaderIcon = () => (
+<span className="absolute top-0.5 left-1/2 -translate-x-1/2 h-5 w-5 flex items-center justify-center z-10" title="Highest Receiving %">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="silver" className="w-5 h-5">
+<path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6a3 3 0 003 3h10.5a3 3 0 003-3v-6a3 3 0 00-3-3v-3A5.25 5.25 0 0012 1.5zm-3.75 5.25a3.75 3.75 0 107.5 0v3h-7.5v-3z" clipRule="evenodd" />
+</svg>
+</span>
+);
+const ReceptionLeaderIcon = () => (
+<span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-5 w-5 flex items-center justify-center z-10" title="Most Reception Attempts">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-5 h-5">
+<path d="M12 2L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-3z" fill="orange" stroke="white" strokeWidth="1.5" />
+</svg>
+</span>
 );
 
-const IconLegend = () => (
-    <div className="mt-4 bg-gray-800 p-3 rounded-lg">
-        <h3 className="text-md font-bold text-center text-cyan-400 mb-2">Stat Leader Legend</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-xs text-white">
-        <div className="flex items-center space-x-2"><div className="relative w-5 h-5"><AceLeaderIcon /></div><span>Ace</span></div>
-        <div className="flex items-center space-x-2"><div className="relative w-5 h-5"><KillLeaderIcon /></div><span>Kill</span></div>
-        <div className="flex items-center space-x-2"><div className="relative w-5 h-5"><DigLeaderIcon /></div><span>Dig</span></div>
-        <div className="flex items-center space-x-2"><div className="relative w-5 h-5"><HittingPercentageLeaderIcon /></div><span>Hit %</span></div>
-        <div className="flex items-center space-x-2"><div className="relative w-5 h-5"><ReceivingLeaderIcon /></div><span>Recv %</span></div>
-        <div className="flex items-center space-x-2"><div className="relative w-5 h-5"><ReceptionLeaderIcon /></div><span>Recv Att</span></div>
-        <div className="flex items-center space-x-2"><div className="relative w-5 h-5"><RELeaderIcon /></div><span>Recv Err</span></div>
-        </div>
-    </div>
-);
+// --- Stat Calculation Helper ---
+const calculateVbrt = (stats) => {
+if (!stats) return '0.00';
+const kills = stats['Kill'] || 0;
+const aces = stats['Ace'] || 0;
+const blocks = stats['Block'] || 0;
+const assists = stats['Assist'] || 0;
+const digs = stats['Dig'] || 0;
+const hitErrors = stats['Hit Error'] || 0;
+const setErrors = stats['Set Error'] || 0;
+const serveErrors = stats['Serve Error'] || 0;
+const blockErrors = stats['Block Error'] || 0;
+const allErrors = hitErrors + setErrors + serveErrors + blockErrors;
+const receptionScore = stats['Reception Score'] || 0;
+const receptionAttempts = stats['Reception Attempt'] || 0;
+const receiveAvg = receptionAttempts > 0 ? receptionScore / receptionAttempts : 0;
+const receptionComponent = receptionAttempts > 0 ? receiveAvg - 1.5 : 0;
+const totalRating = (kills * 1.25) + (aces * 1.5) + (blocks * 2) - allErrors + (assists * 0.5) + (digs * 0.25) + receptionComponent;
+return totalRating.toFixed(2);
+};
 
-const StatsTable = ({ statsData, rosterData }) => {
-    const currentRoster = rosterData || [];
-    const STAT_ORDER = ['Serve Attempt', 'Ace', 'Serve Error', 'Hit Attempt', 'Kill', 'Hit Error', 'Set Attempt', 'Assist', 'Set Error', 'Block', 'Block Error', 'Dig', 'RE'];
-    const teamTotals = {};
-    const allStatKeys = new Set(STAT_ORDER);
-    currentRoster.forEach(p => {
-    if(statsData && statsData[p.id]) {
-    Object.keys(statsData[p.id]).forEach(stat => allStatKeys.add(stat));
+// --- Main App Component ---
+export default function App() {
+// --- State Management ---
+const [gameState, setGameState] = useState({ homeScore: 0, opponentScore: 0, homeSetsWon: 0, opponentSetsWon: 0, servingTeam: null, homeSubs: 0, currentSet: 1, rotation: 1 });
+const [matchPhase, setMatchPhase] = useState('pre_match');
+const [matchId, setMatchId] = useState(null);
+const [matchName, setMatchName] = useState('');
+const [homeTeamName, setHomeTeamName] = useState('HOME');
+const [opponentTeamName, setOpponentTeamName] = useState('OPPONENT');
+const [roster, setRoster] = useState([]);
+const [lineup, setLineup] = useState({ p1: null, p2: null, p3: null, p4: null, p5: null, p6: null });
+const [liberos, setLiberos] = useState([]);
+const [liberoServingFor, setLiberoServingFor] = useState(null);
+const [liberoHasServedFor, setLiberoHasServedFor] = useState(null);
+const [currentServerId, setCurrentServerId] = useState(null);
+const [isWaitingForLiberoServeChoice, setIsWaitingForLiberoServeChoice] = useState(false);
+const [setterId, setSetterId] = useState(null);
+const [bench, setBench] = useState([]);
+const [pointLog, setPointLog] = useState([]);
+const [playerStats, setPlayerStats] = useState({});
+const [allSetStats, setAllSetStats] = useState({});
+const [seasonStats, setSeasonStats] = useState({});
+const [rotationScores, setRotationScores] = useState({});
+const [history, setHistory] = useState([]);
+// UI State
+const [modal, setModal] = useState(null);
+const [subTarget, setSubTarget] = useState({ position: null, playerOutId: null });
+const [statToAssign, setStatToAssign] = useState(null);
+const [kwdaAttackerId, setKwdaAttackerId] = useState(null);
+const [hitContext, setHitContext] = useState({ attackerId: null, originalStat: null });
+const [blockContext, setBlockContext] = useState({ primaryBlockerId: null });
+const [activeTab, setActiveTab] = useState('set_stats');
+const [setupStep, setSetupStep] = useState('players');
+const [savedMatches, setSavedMatches] = useState([]);
+const [autoSaveStatus, setAutoSaveStatus] = useState('Saved  ✓ ');
+const [viewingSet, setViewingSet] = useState(1);
+const [itemToDelete, setItemToDelete] = useState(null);
+// Firebase state
+const [db, setDb] = useState(null);
+const [auth, setAuth] = useState(null);
+const [userId, setUserId] = useState(null);
+const [isAuthReady, setIsAuthReady] = useState(false);
+const autoSaveTimeoutRef = useRef(null);
+
+const viewingSetStats = useMemo(() => allSetStats[viewingSet] || {}, [allSetStats, viewingSet]);
+
+const earnedPoints = useMemo(() => {
+    let earned = 0;
+    const unearned = pointLog.filter(log => log === 'H: Opponent Error!').length;
+    for (const playerId in playerStats) {
+        earned += playerStats[playerId]['Ace'] || 0;
+        earned += playerStats[playerId]['Kill'] || 0;
+        earned += playerStats[playerId]['Block'] || 0;
     }
-    });
-    allStatKeys.forEach(stat => {
-    teamTotals[stat] = currentRoster.reduce((total, player) => total + (statsData[player.id]?.[stat] || 0), 0);
-    });
-    return (
-    <div className="p-3 overflow-x-auto">
-    <table className="w-full text-sm text-left">
-    <thead className="text-xs text-cyan-400 uppercase bg-gray-700">
-    <tr>
-    <th className="px-4 py-2">Player</th>
-    {STAT_ORDER.map(stat => <th key={stat} className="px-2 py-2 text-center">{stat.replace('Attempt', 'Att').replace('Error', 'Err')}</th>)}
-    <th className="px-2 py-2 text-center">Hit %</th>
-    <th className="px-2 py-2 text-center">VBRT</th>
-    </tr>
-    </thead>
-    <tbody>
-    {currentRoster.map(player => (
-    <tr key={player.id} className="border-b border-gray-700">
-    <td className="px-4 py-2 font-medium whitespace-nowrap">#{player.number} {player.name}</td>
-    {STAT_ORDER.map(stat => (<td key={stat} className="px-2 py-2 text-center">{statsData[player.id]?.[stat] || 0}</td>))}
-    <td className="px-2 py-2 text-center">{calculateHittingPercentage(statsData[player.id])}</td>
-    <td className="px-2 py-2 text-center font-bold">{calculateVbrt(statsData[player.id])}</td>
-    </tr>
-    ))}
-    </tbody>
-    <tfoot>
-    <tr className="font-bold text-cyan-400 bg-gray-700">
-    <td className="px-4 py-2">TEAM TOTAL</td>
-    {STAT_ORDER.map(stat => (<td key={stat} className="px-2 py-2 text-center">{teamTotals[stat] || 0}</td>))}
-    <td className="px-2 py-2 text-center">{calculateHittingPercentage(teamTotals)}</td>
-    <td className="px-2 py-2 text-center font-bold">{calculateVbrt(teamTotals)}</td>
-    </tr>
-    </tfoot>
-    </table>
-    </div>
-    );
+    return { earned, unearned };
+}, [playerStats, pointLog]);
+
+// --- Stat Leader Calculation ---
+const statLeaders = useMemo(() => {
+const leaders = { ace: null, kill: null, dig: null, re: null, hitPct: null, receivePct: null, receiveAtt: null };
+const statsToCalc = allSetStats[viewingSet] || {};
+const statsToTrack = { ace: 'Ace', kill: 'Kill', dig: 'Dig', re: 'RE', receiveAtt: 'Reception Attempt' };
+const maxStats = { ace: 0, kill: 0, dig: 0, re: 0, receiveAtt: 0 };
+for (const playerId in statsToCalc) {
+maxStats.ace = Math.max(maxStats.ace, statsToCalc[playerId]?.Ace || 0);
+maxStats.kill = Math.max(maxStats.kill, statsToCalc[playerId]?.Kill || 0);
+maxStats.dig = Math.max(maxStats.dig, statsToCalc[playerId]?.Dig || 0);
+maxStats.re = Math.max(maxStats.re, statsToCalc[playerId]?.RE || 0);
+maxStats.receiveAtt = Math.max(maxStats.receiveAtt, statsToCalc[playerId]?.['Reception Attempt'] || 0);
+}
+const tiedPlayers = { ace: [], kill: [], dig: [], re: [], receiveAtt: [] };
+for (const playerId in statsToCalc) {
+if ((statsToCalc[playerId]?.Ace || 0) === maxStats.ace && maxStats.ace > 0) tiedPlayers.ace.push(playerId);
+if ((statsToCalc[playerId]?.Kill || 0) === maxStats.kill && maxStats.kill > 0) tiedPlayers.kill.push(playerId);
+if ((statsToCalc[playerId]?.Dig || 0) === maxStats.dig && maxStats.dig > 0) tiedPlayers.dig.push(playerId);
+if ((statsToCalc[playerId]?.RE || 0) === maxStats.re && maxStats.re > 0) tiedPlayers.re.push(playerId);
+if ((statsToCalc[playerId]?.['Reception Attempt'] || 0) === maxStats.receiveAtt && maxStats.receiveAtt > 0) tiedPlayers.receiveAtt.push(playerId);
+}
+for (const key in tiedPlayers) {
+if (tiedPlayers[key].length === 1) {
+leaders[key] = tiedPlayers[key][0];
+} else if (tiedPlayers[key].length > 1) {
+const statName = statsToTrack[key];
+const reversedLog = [...pointLog].reverse();
+for (const logEntry of reversedLog) {
+const passStatRegex = /^(H|O): (\d-Pass)/;
+const isPassStat = passStatRegex.test(logEntry);
+if (statName === 'Reception Attempt' && isPassStat) {
+const match = logEntry.match(/by #(\d+)/);
+if (match) {
+const playerNumberStr = match[1];
+const player = roster.find(p => p.number === playerNumberStr);
+if (player && tiedPlayers[key].includes(player.id)) {
+leaders[key] = player.id;
+break;
+}
+}
+} else if (statName !== 'Reception Attempt' && !isPassStat) {
+const match = logEntry.match(new RegExp(`${statName} by #(\\d+)`));
+if (match) {
+const playerNumberStr = match[1];
+const player = roster.find(p => p.number === playerNumberStr);
+if (player && tiedPlayers[key].includes(player.id)) {
+leaders[key] = player.id;
+break;
+}
+}
+}
+}
+}
+}
+let maxHitPct = 0;
+let hitPctLeader = null;
+let leaderAttempts = 0;
+const calculateHittingPercentage = (stats) => {
+if (!stats) return -Infinity;
+const kills = stats['Kill'] || 0;
+const errors = stats['Hit Error'] || 0;
+const attempts = stats['Hit Attempt'] || 0;
+if (attempts === 0) return -Infinity;
+return (kills - errors) / attempts;
+};
+for (const playerId in statsToCalc) {
+const playerStats = statsToCalc[playerId];
+if (!playerStats) continue;
+const currentPct = calculateHittingPercentage(playerStats);
+const currentAttempts = playerStats['Hit Attempt'] || 0;
+if (currentPct > 0) {
+if (currentPct > maxHitPct) {
+maxHitPct = currentPct;
+hitPctLeader = playerId;
+leaderAttempts = currentAttempts;
+} else if (currentPct === maxHitPct) {
+if (currentAttempts > leaderAttempts) {
+hitPctLeader = playerId;
+leaderAttempts = currentAttempts;
+}
+}
+}
+}
+leaders.hitPct = hitPctLeader;
+let maxReceivePct = 0;
+let receivePctLeader = null;
+let leaderReceiveAttempts = 0;
+const calculateReceptionPercentage = (stats) => {
+if (!stats) return -Infinity;
+const attempts = stats['Reception Attempt'] || 0;
+const score = stats['Reception Score'] || 0;
+if (attempts === 0) return -Infinity;
+return score / attempts;
+};
+for (const playerId in statsToCalc) {
+const playerStats = statsToCalc[playerId];
+if (!playerStats) continue;
+const currentPct = calculateReceptionPercentage(playerStats);
+const currentAttempts = playerStats['Reception Attempt'] || 0;
+if (currentPct > 0) {
+if (currentPct > maxReceivePct) {
+maxReceivePct = currentPct;
+receivePctLeader = playerId;
+leaderReceiveAttempts = currentAttempts;
+} else if (currentPct === maxReceivePct) {
+if (currentAttempts > leaderReceiveAttempts) {
+receivePctLeader = playerId;
+leaderReceiveAttempts = currentAttempts;
+}
+}
+}
+}
+leaders.receivePct = receivePctLeader;
+return leaders;
+}, [allSetStats, viewingSet, pointLog, roster]);
+
+// --- Firebase Initialization & Auth ---
+useEffect(() => {
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
+};
+if (!firebaseConfig.apiKey) {
+  console.error("Firebase config is missing. Make sure VITE_ environment variables are set in Vercel.");
+  return;
+}
+try {
+  const app = initializeApp(firebaseConfig);
+  const firestoreDb = getFirestore(app);
+  const firebaseAuth = getAuth(app);
+  setDb(firestoreDb);
+  setAuth(firebaseAuth);
+  onAuthStateChanged(firebaseAuth, async (user) => {
+    if (user) {
+      setUserId(user.uid);
+    } else {
+      await signInAnonymously(firebaseAuth);
+    }
+    setIsAuthReady(true);
+  });
+} catch (error) {
+  console.error("Firebase initialization error:", error);
+}
+}, []);
+
+// --- Data Persistence ---
+const getMatchCollectionRef = useCallback(() => {
+if (!db || !userId) return null;
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+return collection(db, 'artifacts', appId, 'users', userId, 'matches');
+}, [db, userId]);
+
+const autoSaveMatchToFirebase = useCallback(async () => {
+if (!getMatchCollectionRef() || !matchId) {
+return;
+}
+setAutoSaveStatus('Saving...');
+const matchData = { matchId, matchName, homeTeamName, opponentTeamName, lastSaved: new Date().toISOString(), gameState, matchPhase, roster, lineup, liberos, liberoServingFor, liberoHasServedFor, setterId, bench, pointLog, playerStats, allSetStats, rotationScores };
+try {
+await setDoc(doc(getMatchCollectionRef(), matchId), matchData);
+setAutoSaveStatus('Saved  ✓ ');
+} catch (error) {
+console.error("Autosave error:", error);
+setAutoSaveStatus('Save Error!');
+}
+}, [db, userId, matchId, matchName, homeTeamName, opponentTeamName, gameState, matchPhase, roster, lineup, liberos, liberoServingFor, liberoHasServedFor, setterId, bench, pointLog, playerStats, allSetStats, rotationScores]);
+
+useEffect(() => {
+if (matchPhase !== 'playing' || !matchId) {
+return;
+}
+if (autoSaveTimeoutRef.current) {
+clearTimeout(autoSaveTimeoutRef.current);
+}
+setAutoSaveStatus('Unsaved changes...');
+autoSaveTimeoutRef.current = setTimeout(() => {
+autoSaveMatchToFirebase();
+}, 3000);
+return () => {
+if (autoSaveTimeoutRef.current) {
+clearTimeout(autoSaveTimeoutRef.current);
+}
+};
+}, [gameState, lineup, allSetStats, pointLog, bench, setterId, liberos, liberoServingFor, liberoHasServedFor, currentServerId, matchPhase, matchId, autoSaveMatchToFirebase]);
+
+const calculateSeasonStats = async () => {
+    if (!getMatchCollectionRef()) return;
+    try {
+        const querySnapshot = await getDocs(getMatchCollectionRef());
+        const allMatches = querySnapshot.docs.map(doc => doc.data());
+        const compiledData = {};
+
+        allMatches.forEach(match => {
+            if (!match.roster || !match.playerStats) return;
+
+            match.roster.forEach(player => {
+                const key = player.number;
+                if (!compiledData[key]) {
+                    compiledData[key] = {
+                        name: player.name,
+                        number: player.number,
+                        stats: {}
+                    };
+                }
+
+                const matchPlayerStats = match.playerStats[player.id];
+                if (matchPlayerStats) {
+                    for (const stat in matchPlayerStats) {
+                        compiledData[key].stats[stat] = (compiledData[key].stats[stat] || 0) + matchPlayerStats[stat];
+                    }
+                }
+            });
+        });
+        
+        setSeasonStats(compiledData);
+
+    } catch (error) {
+        console.error("Error calculating season stats:", error);
+    }
 };
 
-const ReceivingStatsTable = ({ statsData, rosterData }) => {
-    const currentRoster = rosterData || [];
-    const teamTotals = { attempts: 0, score: 0 };
-    currentRoster.forEach(player => {
-    teamTotals.attempts += statsData[player.id]?.['Reception Attempt'] || 0;
-    teamTotals.score += statsData[player.id]?.['Reception Score'] || 0;
-    });
-    return (
-    <div className="p-3 overflow-x-auto">
-    <table className="w-full text-sm text-left">
-    <thead className="text-xs text-cyan-400 uppercase bg-gray-700">
-    <tr>
-    <th className="px-4 py-2">Player</th>
-    <th className="px-4 py-2 text-center">Attempts</th>
-    <th className="px-4 py-2 text-center">Score</th>
-    <th className="px-4 py-2 text-center">Avg</th>
-    </tr>
-    </thead>
-    <tbody>
-    {currentRoster.map(player => (
-    <tr key={player.id} className="border-b border-gray-700">
-    <td className="px-4 py-2 font-medium whitespace-nowrap">#{player.number} {player.name}</td>
-    <td className="px-4 py-2 text-center">{statsData[player.id]?.['Reception Attempt'] || 0}</td>
-    <td className="px-4 py-2 text-center">{statsData[player.id]?.['Reception Score'] || 0}</td>
-    <td className="px-4 py-2 text-center">{calculateVbrt(statsData[player.id])}</td>
-    </tr>
-    ))}
-    </tbody>
-    <tfoot>
-    <tr className="font-bold text-cyan-400 bg-gray-700">
-    <td className="px-4 py-2">TEAM TOTAL</td>
-    <td className="px-4 py-2 text-center">{teamTotals.attempts}</td>
-    <td className="px-4 py-2 text-center">{teamTotals.score}</td>
-    <td className="px-4 py-2 text-center">{(teamTotals.attempts > 0 ? teamTotals.score / teamTotals.attempts : 0).toFixed(2)}</td>
-    </tr>
-    </tfoot>
-    </table>
-    </div>
-    );
+const saveMatchToFirebase = async () => {
+if (autoSaveTimeoutRef.current) {
+clearTimeout(autoSaveTimeoutRef.current);
+}
+await autoSaveMatchToFirebase();
+alert("Match saved successfully!");
 };
 
-const SeasonStatsTable = () => {
-    const playersToDisplay = Object.values(seasonStats).sort((a, b) => a.number - b.number);
-    const STAT_ORDER = ['Serve Attempt', 'Ace', 'Serve Error', 'Hit Attempt', 'Kill', 'Hit Error', 'Set Attempt', 'Assist', 'Set Error', 'Block', 'Block Error', 'Dig', 'Reception Attempt', 'Reception Score', 'RE'];
-    const calculateHittingPercentage = (stats) => {
-        if (!stats) return '.000';
-        const kills = stats['Kill'] || 0;
-        const errors = stats['Hit Error'] || 0;
-        const attempts = stats['Hit Attempt'] || 0;
-        if (attempts === 0) return '.000';
-        return ((kills - errors) / attempts).toFixed(3);
-    };
-    const teamTotals = STAT_ORDER.reduce((acc, stat) => {
-        acc[stat] = playersToDisplay.reduce((total, playerData) => total + (playerData.stats[stat] || 0), 0);
-        return acc;
-    }, {});
-    return (
-        <div className="p-3 overflow-x-auto">
-            <table className="w-full text-sm text-left">
-                <thead className="text-xs text-cyan-400 uppercase bg-gray-700">
-                    <tr>
-                        <th className="px-4 py-2">Player</th>
-                        {STAT_ORDER.map(stat => <th key={stat} className="px-2 py-2 text-center">{stat.replace('Attempt', 'Att').replace('Error', 'Err').replace('Reception', 'Rec')}</th>)}
-                        <th className="px-2 py-2 text-center">Hit %</th>
-                        <th className="px-2 py-2 text-center">VBRT</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {playersToDisplay.map(playerData => (
-                        <tr key={playerData.number} className="border-b border-gray-700">
-                            <td className="px-4 py-2 font-medium whitespace-nowrap">#{playerData.number} {playerData.name}</td>
-                            {STAT_ORDER.map(stat => <td key={stat} className="px-2 py-2 text-center">{playerData.stats[stat] || 0}</td>)}
-                            <td className="px-2 py-2 text-center">{calculateHittingPercentage(playerData.stats)}</td>
-                            <td className="px-2 py-2 text-center font-bold">{calculateVbrt(playerData.stats)}</td>
-                        </tr>
-                    ))}
-                </tbody>
-                <tfoot>
-                    <tr className="font-bold text-cyan-400 bg-gray-700">
-                        <td className="px-4 py-2">TEAM TOTAL</td>
-                        {STAT_ORDER.map(stat => <td key={stat} className="px-2 py-2 text-center">{teamTotals[stat] || 0}</td>)}
-                        <td className="px-2 py-2 text-center">{calculateHittingPercentage(teamTotals)}</td>
-                        <td className="px-2 py-2 text-center font-bold">{calculateVbrt(teamTotals)}</td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-    );
+const loadMatchesFromFirebase = async () => {
+if (!getMatchCollectionRef()) return;
+try {
+const querySnapshot = await getDocs(getMatchCollectionRef());
+const matches = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+setSavedMatches(matches);
+setModal('load-match');
+} catch (error) {
+console.error("Error loading matches:", error);
+}
 };
 
-const TabbedDisplay = () => {
-    const setNumbers = Object.keys(allSetStats).sort((a, b) => a - b);
-    return (
-        <div className="mt-4 bg-gray-800 rounded-lg">
-            <div className="flex border-b border-gray-700 items-center flex-wrap">
-                <button onClick={() => setActiveTab('set_stats')} className={`py-2 px-4 font-bold ${activeTab === 'set_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Set Stats</button>
-                <button onClick={() => setActiveTab('receiving_stats')} className={`py-2 px-4 font-bold ${activeTab === 'receiving_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Receiving Stats</button>
-                <button onClick={() => setActiveTab('match_stats')} className={`py-2 px-4 font-bold ${activeTab === 'match_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Match Stats</button>
-                <button onClick={() => { setActiveTab('season_stats'); calculateSeasonStats(); }} className={`py-2 px-4 font-bold ${activeTab === 'season_stats' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Season Stats</button>
-                <button onClick={() => setActiveTab('log')} className={`py-2 px-4 font-bold ${activeTab === 'log' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Point Log</button>
-                <button onClick={() => setActiveTab('rotations')} className={`py-2 px-4 font-bold ${activeTab === 'rotations' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Rotation Tracker</button>
-            </div>
+const loadSpecificMatch = (matchData) => {
+setMatchId(matchData.matchId); setMatchName(matchData.matchName); setHomeTeamName(matchData.homeTeamName || 'HOME'); setOpponentTeamName(matchData.opponentTeamName || 'OPPONENT'); setGameState(matchData.gameState); setMatchPhase(matchData.matchPhase); setRoster(matchData.roster); setLineup(matchData.lineup); setLiberos(matchData.liberos || []); setLiberoServingFor(matchData.liberoServingFor || null);
+setLiberoHasServedFor(matchData.liberoHasServedFor || null); setSetterId(matchData.setterId); setBench(matchData.bench); setPointLog(matchData.pointLog); setPlayerStats(matchData.playerStats); setAllSetStats(matchData.allSetStats || {}); setRotationScores(matchData.rotationScores); setHistory([]); setModal(null);
+setCurrentServerId(matchData.lineup?.p1 || null);
+setViewingSet(matchData.gameState.currentSet);
+};
 
-            {(activeTab === 'set_stats' || activeTab === 'receiving_stats') && setNumbers.length > 0 && (
-                 <div className="p-3 border-b border-gray-700">
-                    <span className="font-bold mr-4">View Stats for:</span>
-                    <div className="inline-flex rounded-md shadow-sm" role="group">
-                        {setNumbers.map(setNum => (
-                            <button
-                                key={setNum}
-                                onClick={() => setViewingSet(Number(setNum))}
-                                type="button"
-                                className={`px-4 py-2 text-sm font-medium ${Number(setNum) === viewingSet ? 'bg-cyan-600 text-white' : 'bg-gray-900 hover:bg-gray-700'} border border-gray-600 first:rounded-l-lg last:rounded-r-lg`}
-                            >
-                                Set {setNum}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
+const loadMostRecentRoster = async () => {
+  if (!getMatchCollectionRef()) return null;
+  const q = query(getMatchCollectionRef(), orderBy("lastSaved", "desc"), limit(1));
+  try {
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      const lastMatch = querySnapshot.docs[0].data();
+      return lastMatch.roster;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error loading most recent roster:", error);
+    return null;
+  }
+};
 
-            {activeTab === 'set_stats' && <StatsTable statsData={viewingSetStats} rosterData={roster} />}
-            {activeTab === 'receiving_stats' && <ReceivingStatsTable statsData={viewingSetStats} rosterData={roster} />}
-            {activeTab === 'match_stats' && <StatsTable statsData={playerStats} rosterData={roster} />}
-            {activeTab === 'season_stats' && <SeasonStatsTable />}
-            {activeTab === 'log' && (<div className="p-3"><ul className="text-sm h-64 overflow-y-auto flex flex-col-reverse">{pointLog.map((log, i) => <li key={i} className="p-1 border-b border-gray-700">{log}</li>)}</ul></div>)}
-            {activeTab === 'rotations' && (
-            <div className="p-3">
-            <table className="w-full text-sm text-left">
-            <thead className="text-xs text-cyan-400 uppercase bg-gray-700">
-            <tr><th className="px-4 py-2">Rotation</th><th className="px-4 py-2 text-center">Home Points</th><th className="px-4 py-2 text-center">Opponent Points</th><th className="px-4 py-2 text-center">+/-</th></tr>
-            </thead>
-            <tbody>
-            {Object.keys(rotationScores).map(rNum => {
-            const s = rotationScores[rNum] || {home: 0, opponent: 0};
-            const d = s.home - s.opponent;
-            return (<tr key={rNum} className={`${d > 0 ? 'bg-green-900/50' : d < 0 ? 'bg-red-900/50' : ''} border-b border-gray-700`}><td className="px-4 py-2 font-medium">Rotation {rNum}</td><td className="px-4 py-2 text-center">{s.home}</td><td className="px-4 py-2 text-center">{s.opponent}</td><td className="px-4 py-2 text-center font-bold">{d > 0 ? `+${d}` : d}</td></tr>);
-            })}
-            </tbody>
-            </table>
-            </div>
-            )}
-        </div>
-    );
+const promptDeleteMatch = (matchId) => {
+    setItemToDelete({id: matchId, type: 'match'});
+    setModal('confirm-delete-match');
+};
+
+const handleDeleteMatch = async () => {
+    if (!itemToDelete || itemToDelete.type !== 'match') return;
+    try {
+        await deleteDoc(doc(getMatchCollectionRef(), itemToDelete.id));
+        setSavedMatches(prev => prev.filter(match => match.id !== itemToDelete.id));
+        setItemToDelete(null);
+        setModal(null);
+    } catch (error) {
+        console.error("Error deleting match:", error);
+        alert("Could not delete match.");
+    }
+};
+
+// --- Undo and History Logic ---
+const saveToHistory = () => {
+const snapshot = { gameState: JSON.parse(JSON.stringify(gameState)), lineup: JSON.parse(JSON.stringify(lineup)), playerStats: JSON.parse(JSON.stringify(playerStats)), allSetStats: JSON.parse(JSON.stringify(allSetStats)), pointLog: JSON.parse(JSON.stringify(pointLog)), bench: JSON.parse(JSON.stringify(bench)), rotationScores: JSON.parse(JSON.stringify(rotationScores)), setterId: setterId, currentServerId: currentServerId, liberoHasServedFor: liberoHasServedFor };
+setHistory(prev => [...prev, snapshot]);
+};
+
+const handleUndo = () => {
+if (history.length === 0) return;
+const lastState = history[history.length - 1];
+setGameState(lastState.gameState); setLineup(lastState.lineup); setPlayerStats(lastState.playerStats); setAllSetStats(lastState.allSetStats); setPointLog(lastState.pointLog); setBench(lastState.bench); setRotationScores(lastState.rotationScores); setSetterId(lastState.setterId); setCurrentServerId(lastState.currentServerId); setLiberoHasServedFor(lastState.liberoHasServedFor);
+setHistory(prev => prev.slice(0, -1));
+};
+
+// --- Game Logic Functions ---
+const handleStartNewMatch = () => setModal('roster');
+
+const handleSaveRoster = (newRoster, name, homeName, oppName) => {
+const newMatchId = crypto.randomUUID();
+setMatchId(newMatchId); setMatchName(name);
+setHomeTeamName(homeName || 'HOME');
+setOpponentTeamName(oppName || 'OPPONENT');
+const rosterWithIds = newRoster.map(p => ({ ...p, id: crypto.randomUUID() }));
+setRoster(rosterWithIds);
+const initialPlayerStats = {};
+rosterWithIds.forEach(p => { initialPlayerStats[p.id] = {}; });
+setPlayerStats(initialPlayerStats);
+setAllSetStats({});
+setGameState({ homeScore: 0, opponentScore: 0, homeSetsWon: 0, opponentSetsWon: 0, servingTeam: null, homeSubs: 0, currentSet: 1, rotation: 1 });
+setMatchPhase('lineup_setup'); setModal(null);
+};
+
+const handleEndSet = () => {
+const winner = gameState.homeScore > gameState.opponentScore ? 'home' : 'opponent';
+const newHomeSetsWon = gameState.homeSetsWon + (winner === 'home' ? 1 : 0);
+const newOpponentSetsWon = gameState.opponentSetsWon + (winner === 'opponent' ? 1 : 0);
+if (newHomeSetsWon >= 3 || newOpponentSetsWon >= 3) {
+setMatchPhase('post_match');
+setGameState(prev => ({ ...prev, homeSetsWon: newHomeSetsWon, opponentSetsWon: newOpponentSetsWon }));
+return;
+}
+const nextSetNumber = gameState.currentSet + 1;
+const newSetStats = {};
+roster.forEach(p => { newSetStats[p.id] = {}; });
+setAllSetStats(prev => ({...prev, [nextSetNumber]: newSetStats }));
+setGameState(prev => ({ ...prev, homeScore: 0, opponentScore: 0, homeSetsWon: newHomeSetsWon, opponentSetsWon: newOpponentSetsWon, currentSet: nextSetNumber, homeSubs: 0, servingTeam: null, rotation: 1 }));
+setLineup({ p1: null, p2: null, p3: null, p4: null, p5: null, p6: null }); setLiberos([]); setSetterId(null); setBench([]); setPointLog([]); setHistory([]); setSetupStep('players');
+setMatchPhase('lineup_setup'); setModal(null); setLiberoServingFor(null); setLiberoHasServedFor(null);
+setViewingSet(nextSetNumber);
+};
+
+const handleEndMatch = async () => {
+    await autoSaveMatchToFirebase();
+    setMatchPhase('post_match');
+    setModal(null);
+};
+
+const determineServer = (serverPositionPlayerId, servingTeam) => {
+if (servingTeam !== 'home') {
+setCurrentServerId(null);
+return;
+}
+if (liberoServingFor === serverPositionPlayerId && liberos.length > 0) {
+setIsWaitingForLiberoServeChoice(true);
+setModal('confirm-libero-serve');
+} else {
+setCurrentServerId(serverPositionPlayerId);
+}
+};
+
+const handleLiberoServeChoice = (isLiberoServing) => {
+const playerInServePosition = lineup.p1;
+if (isLiberoServing) {
+if (liberoHasServedFor && liberoHasServedFor !== playerInServePosition) {
+setModal('illegal-libero-serve');
+return;
+}
+if (!liberoHasServedFor) {
+setLiberoHasServedFor(playerInServePosition);
+}
+setCurrentServerId(liberos[0]);
+} else {
+setCurrentServerId(playerInServePosition);
+}
+setIsWaitingForLiberoServeChoice(false);
+setModal(null);
+};
+
+const handleStartSet = (servingTeam) => {
+    const lineupIds = Object.values(lineup).filter(Boolean);
+    const onCourtIds = [...lineupIds, ...liberos];
+    setBench(roster.filter(p => !onCourtIds.includes(p.id)));
+    const initialSetStats = {};
+    roster.forEach(p => { initialSetStats[p.id] = {}; });
+    setAllSetStats(prev => ({ ...prev, [gameState.currentSet]: initialSetStats }));
+    const initialRotationScores = {};
+    for (let i = 1; i <= 6; i++) { initialRotationScores[i] = { home: 0, opponent: 0 }; }
+    setRotationScores(initialRotationScores);
+    setGameState(prev => ({ ...prev, servingTeam, homeScore: 0, opponentScore: 0, homeSubs: 0 }));
+    setPointLog([]);
+    setHistory([]);
+    setMatchPhase('playing');
+    setModal(null);
+    determineServer(lineup.p1, servingTeam);
+};
+
+const rotate = (callback) => {
+const newLineup = { p1: lineup.p2, p2: lineup.p3, p3: lineup.p4, p4: lineup.p5, p5: lineup.p6, p6: lineup.p1 };
+setLineup(newLineup);
+setGameState(prev => ({ ...prev, rotation: (prev.rotation % 6) + 1 }));
+callback(newLineup.p1);
+};
+
+const logServeAttempt = (serverId) => {
+if (!serverId) return;
+const increment = (stats) => {
+const newStats = JSON.parse(JSON.stringify(stats));
+if (!newStats[serverId]) newStats[serverId] = {};
+newStats[serverId]['Serve Attempt'] = (newStats[serverId]['Serve Attempt'] || 0) + 1;
+return newStats;
+};
+setPlayerStats(prev => increment(prev));
+setAllSetStats(prev => ({ ...prev, [gameState.currentSet]: increment(prev[gameState.currentSet]) }));
+};
+
+const awardPoint = (scoringTeam, reason) => {
+const servingTeamBeforePoint = gameState.servingTeam;
+if (servingTeamBeforePoint === 'home') {
+logServeAttempt(currentServerId);
+}
+const wasOpponentServing = servingTeamBeforePoint === 'opponent';
+const currentRotation = gameState.rotation;
+setRotationScores(prevScores => {
+const newScores = { ...prevScores };
+if (!newScores[currentRotation]) newScores[currentRotation] = { home: 0, opponent: 0 };
+if (scoringTeam === 'home') { newScores[currentRotation].home += 1; }
+else { newScores[currentRotation].opponent += 1; }
+return newScores;
+});
+const updateScoresAndServe = () => {
+setGameState(prev => ({ ...prev, homeScore: prev.homeScore + (scoringTeam === 'home' ? 1 : 0), opponentScore: prev.opponentScore + (scoringTeam === 'opponent' ? 1 : 0), servingTeam: scoringTeam }));
+if (scoringTeam === 'home' && wasOpponentServing) {
+rotate((newServerId) => determineServer(newServerId, 'home'));
+} else if (scoringTeam !== 'home') {
+setCurrentServerId(null);
+}
+};
+updateScoresAndServe();
+};
+
+// --- Stat Logic ---
+const handleStatClick = (stat) => {
+if (isWaitingForLiberoServeChoice) {
+alert("Please determine who is serving before assigning a stat.");
+return;
+}
+const passingStats = ['3-Pass', '2-Pass', '1-Pass', 'RE'];
+if (passingStats.includes(stat) && gameState.servingTeam === 'home') {
+setModal('illegal-pass');
+return;
+}
+saveToHistory();
+if (stat === 'Kill' && setterId === null) { setStatToAssign('KWDA'); setModal('assign-stat'); return; }
+const nonPlayerStats = ['Opponent Error', 'Opponent Point'];
+if (nonPlayerStats.includes(stat)) {
+if (stat === 'Opponent Error') { awardPoint('home', 'Opponent Error'); setPointLog(prev => [`H: Opponent Error!`, ...prev]); }
+else { awardPoint('opponent', 'Opponent Point'); setPointLog(prev => [`O: Point Opponent`, ...prev]); }
+return;
+}
+const servingStats = ['Ace', 'Serve Error'];
+if (servingStats.includes(stat)) {
+if (gameState.servingTeam !== 'home') { handleUndo(); setModal('not-serving-error'); return; }
+if (currentServerId) assignStatToPlayer(currentServerId, stat);
+return;
+}
+setStatToAssign(stat); setModal('assign-stat');
+};
+
+const incrementStats = (stats, playerId, statToLog, currentSetterId, value = 1) => {
+const newStats = JSON.parse(JSON.stringify(stats));
+const increment = (pId, s, val) => { if (!newStats[pId]) newStats[pId] = {};
+newStats[pId][s] = (newStats[pId][s] || 0) + val; };
+increment(playerId, statToLog, value);
+if (['Kill', 'Hit Error', 'Hit Attempt'].includes(statToLog)) { increment(playerId, 'Hit Attempt', 1); }
+if (['Assist', 'Set Error'].includes(statToLog)) { increment(playerId, 'Set Attempt', 1); }
+if (statToLog === 'Kill' && currentSetterId && currentSetterId !== playerId) { increment(currentSetterId, 'Assist', 1); increment(currentSetterId, 'Set Attempt', 1); }
+const passValues = { '3-Pass': 3, '2-Pass': 2, '1-Pass': 1, 'RE': 0 };
+if (statToLog in passValues) {
+increment(playerId, 'Reception Attempt', 1);
+increment(playerId, 'Reception Score', passValues[statToLog]);
+}
+return newStats;
+};
+
+const assignStatToPlayer = (playerId, stat) => {
+const statToLog = stat || statToAssign;
+const player = roster.find(p => p.id === playerId);
+if (!statToLog || !player) return;
+if (statToLog === 'Hit Attempt' || statToLog === 'Hit Error') {
+setHitContext({ attackerId: playerId, originalStat: statToLog });
+setModal('assign-set-attempt');
+return;
+}
+const playerPosition = Object.keys(lineup).find(pos => lineup[pos] === playerId);
+if (statToLog === 'Block') {
+    if (['p1', 'p5', 'p6'].includes(playerPosition)) {
+        setModal('illegal-block');
+        return;
+    }
+    setBlockContext({ primaryBlockerId: playerId });
+    setModal('assign-block-assist');
+    return;
+}
+if (statToLog === 'KWDA') { handleKwdaSelection(playerId); return; }
+setPlayerStats(prev => incrementStats(prev, playerId, statToLog, setterId));
+setAllSetStats(prev => ({...prev, [gameState.currentSet]: incrementStats(prev[gameState.currentSet], playerId, statToLog, setterId)}));
+let pointWinner = null; let logMessage = `H: ${statToLog} by #${player.number} ${player.name}`;
+switch(statToLog) {
+case 'Ace': case 'Kill': pointWinner = 'home'; break;
+case 'Serve Error': case 'Set Error': case 'RE': case 'Block Error': pointWinner = 'opponent';
+logMessage = `O: ${statToLog} by #${player.number} ${player.name}`; break;
+}
+if (pointWinner) awardPoint(pointWinner, statToLog);
+setPointLog(prev => [logMessage, ...prev]);
+setModal(null); setStatToAssign(null);
+};
+
+const handleBlockAward = (assisterId) => {
+    const { primaryBlockerId } = blockContext;
+    const primaryBlocker = roster.find(p => p.id === primaryBlockerId);
+    let logMessage = `H: Block by #${primaryBlocker.number} ${primaryBlocker.name}`;
+
+    if (assisterId) {
+        const assister = roster.find(p => p.id === assisterId);
+        logMessage += ` & #${assister.number} ${assister.name}`;
+        setPlayerStats(prev => incrementStats(prev, primaryBlockerId, 'Block', null, 0.5));
+        setAllSetStats(prev => ({...prev, [gameState.currentSet]: incrementStats(prev[gameState.currentSet], primaryBlockerId, 'Block', null, 0.5)}));
+        setPlayerStats(prev => incrementStats(prev, assisterId, 'Block', null, 0.5));
+        setAllSetStats(prev => ({...prev, [gameState.currentSet]: incrementStats(prev[gameState.currentSet], assisterId, 'Block', null, 0.5)}));
+    } else {
+        setPlayerStats(prev => incrementStats(prev, primaryBlockerId, 'Block', null, 1.0));
+        setAllSetStats(prev => ({...prev, [gameState.currentSet]: incrementStats(prev[gameState.currentSet], primaryBlockerId, 'Block', null, 1.0)}));
+    }
+    
+    awardPoint('home', 'Block');
+    setPointLog(prev => [logMessage, ...prev]);
+    setModal(null);
+    setBlockContext({ primaryBlockerId: null });
+};
+
+const handleKwdaSelection = (attackerId) => {
+const player = roster.find(p => p.id === attackerId); if (!player) return;
+const updateKwdaStats = (stats) => { const newStats = JSON.parse(JSON.stringify(stats));
+const increment = (pId, s) => { if (!newStats[pId]) newStats[pId] = {}; newStats[pId][s] = (newStats[pId][s] || 0) + 1; };
+increment(attackerId, 'Kill'); increment(attackerId, 'Hit Attempt'); return newStats; };
+setPlayerStats(prev => updateKwdaStats(prev));
+setAllSetStats(prev => ({...prev, [gameState.currentSet]: updateKwdaStats(prev[gameState.currentSet])}));
+awardPoint('home', 'KWDA'); setPointLog(prev => [`H: Kill by #${player.number} ${player.name}`, ...prev]);
+setKwdaAttackerId(attackerId);
+setModal('assign-kwda-assist');
+};
+
+const assignKwdaAssist = (assistPlayerId) => {
+if (!assistPlayerId) {
+setModal(null); setStatToAssign(null); setKwdaAttackerId(null);
+return;
+}
+const player = roster.find(p => p.id === assistPlayerId); if (!player) return;
+const updateAssistStats = (stats) => { const newStats = JSON.parse(JSON.stringify(stats));
+const increment = (pId, s) => { if (!newStats[pId]) newStats[pId] = {}; newStats[pId][s] = (newStats[pId][s] || 0) + 1; };
+increment(assistPlayerId, 'Assist'); increment(assistPlayerId, 'Set Attempt'); return newStats; };
+setPlayerStats(prev => updateAssistStats(prev));
+setAllSetStats(prev => ({...prev, [gameState.currentSet]: updateAssistStats(prev[gameState.currentSet])}));
+setPointLog(prev => [`H: Assist by #${player.number} ${player.name}`, ...prev]); setModal(null); setStatToAssign(null); setKwdaAttackerId(null);
+};
+
+const assignSetAttempt = (setterId) => {
+const { attackerId, originalStat } = hitContext;
+const attacker = roster.find(p => p.id === attackerId);
+if (!attacker) return;
+const updateStats = (stats) => {
+let newStats = JSON.parse(JSON.stringify(stats));
+const increment = (pId, s) => { if (!newStats[pId]) { newStats[pId] = {};
+} newStats[pId][s] = (newStats[pId][s] || 0) + 1; };
+increment(attackerId, originalStat);
+increment(attackerId, 'Hit Attempt');
+if (setterId) {
+increment(setterId, 'Set Attempt');
+}
+return newStats;
+};
+setPlayerStats(prev => updateStats(prev));
+setAllSetStats(prev => ({...prev, [gameState.currentSet]: updateStats(prev[gameState.currentSet])}));
+let logMessage = originalStat === 'Hit Error' ? `O: Hit Error by #${attacker.number} ${attacker.name}` : `H: Hit Attempt by #${attacker.number} ${attacker.name}`;
+if (setterId) {
+const setter = roster.find(p => p.id === setterId);
+if(setter) {
+setPointLog(prev => [logMessage, `H: Set by #${setter.number} ${setter.name}`, ...prev]);
+}
+} else {
+setPointLog(prev => [logMessage, ...prev]);
+}
+if (originalStat === 'Hit Error') {
+awardPoint('opponent', 'Hit Error');
+}
+setModal(null);
+setStatToAssign(null);
+setHitContext({ attackerId: null, originalStat: null });
+};
+
+// --- Sub Logic ---
+const handleSubClick = (position, playerOutId) => {
+if (!playerOutId) return;
+setSubTarget({ position, playerOutId });
+setModal('substitute');
+};
+
+const executeSubstitution = (playerInId) => {
+  saveToHistory();
+  const { position, playerOutId } = subTarget;
+  setLineup(prev => ({ ...prev, [position]: playerInId }));
+  setBench(prev => [...prev.filter(p => p.id !== playerInId), roster.find(p => p.id === playerOutId)]);
+  setGameState(prev => ({ ...prev, homeSubs: prev.homeSubs + 1 }));
+  setModal(null);
+};
+
+// --- Lineup Setup Logic ---
+const handleCourtClickForLineup = (position) => {
+if (setupStep === 'players') {
+if (!lineup[position]) { setSubTarget({ position, playerOutId: null }); setModal('lineup-player-select'); }
+else { const lineupIsFullBeforeRemoval = Object.values(lineup).every(p => p !== null); if (lineupIsFullBeforeRemoval) { setSetupStep('players');
+} setLineup(prev => ({ ...prev, [position]: null })); }
+} else if (setupStep === 'setter') {
+const playerId = lineup[position]; if (playerId) { setSetterId(playerId); setModal('select-server'); }
+}
+};
+
+const handlePlayerSelectForLineup = (playerId) => {
+const { position } = subTarget; const newLineup = {...lineup, [position]: playerId}; setLineup(newLineup);
+const lineupIsFull = Object.values(newLineup).every(p => p !== null); if (lineupIsFull) { setSetupStep('libero'); }
+setModal(null);
+};
+
+const handleSetLiberoServe = (playerId) => {
+  setLiberoServingFor(playerId);
+  setModal(null);
 };
 // App.js - Batch 4 of 4
 
@@ -1338,6 +1730,7 @@ const AssignBlockAssistModal = () => {
         </div>
     );
 };
+
 
 // --- Main Render ---
 return (
