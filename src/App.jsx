@@ -1352,6 +1352,7 @@ const LoadMatchModal = () => (
 const LineupPlayerSelectModal = () => { const lineupPlayerIds = Object.values(lineup).filter(Boolean); const availablePlayers = roster.filter(p => !lineupPlayerIds.includes(p.id));
     return (<div><p className="mb-4">Select a player for position <span className="font-bold text-cyan-400">{subTarget.position?.toUpperCase()}</span></p><div className="space-y-2 max-h-80 overflow-y-auto">{availablePlayers.map(player => (<button key={player.id} onClick={() => handlePlayerSelectForLineup(player.id)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">#{player.number} {player.name}</button>))}</div></div>);
 };
+
 const SelectServerModal = () => (
     <div>
         <p className="mb-4 font-bold">Who is serving first?</p>
@@ -1361,13 +1362,120 @@ const SelectServerModal = () => (
         </div>
     </div>
 );
+
+const SubstituteModal = () => (
+    <div>
+        <p className="mb-4">Select a player from the bench to substitute in.</p>
+        <div className="grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+            {bench.map(player => (
+                <button 
+                    key={player.id} 
+                    onClick={() => executeSubstitution(player.id)} 
+                    className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded"
+                >
+                    #{player.number} {player.name}
+                </button>
+            ))}
+        </div>
+    </div>
+);
+
+const AssignStatModal = () => {
+    const courtOrder = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'];
+    const sortedOnCourtPlayers = courtOrder
+        .map(pos => lineup[pos])
+        .filter(Boolean)
+        .map(playerId => roster.find(p => p.id === playerId));
+    
+    const liberoPlayers = liberos
+        .map(liberoId => roster.find(p => p.id === liberoId))
+        .filter(Boolean);
+
+    const onCourtPlayers = [...sortedOnCourtPlayers, ...liberoPlayers];
+
+    return (
+        <div>
+            <p className="mb-4">Assign <span className="font-bold text-cyan-400">{statToAssign}</span> to:</p>
+            <div className="grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+                {onCourtPlayers.map(player => (
+                    <button 
+                        key={player.id} 
+                        onClick={() => assignStatToPlayer(player.id)} 
+                        className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded"
+                    >
+                        #{player.number} {player.name}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const AssignKwdaAssistModal = () => { const onCourtIds = [...Object.values(lineup), ...liberos].filter(Boolean);
+    const onCourtPlayers = roster.filter(p => onCourtIds.includes(p.id) && p.id !== kwdaAttackerId);
+    return (<div><p className="mb-4">Assign <span className="font-bold text-cyan-400">Assist</span> for Kill to:</p><div className="space-y-2 max-h-80 overflow-y-auto">{onCourtPlayers.map(player => (<button key={player.id} onClick={() => assignKwdaAssist(player.id)} className="relative w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">#{player.number} {player.name} {player.id === setterId && <SetterIcon />}</button>))} <button onClick={() => assignKwdaAssist(null)} className="mt-2 w-full text-center bg-gray-600 hover:bg-gray-500 p-2 rounded">No Assist</button> </div></div>);
+};
+
+const SelectNewSetterModal = () => { const onCourtIds = [...Object.values(lineup), ...liberos].filter(Boolean);
+    const onCourtPlayers = roster.filter(p => onCourtIds.includes(p.id) && p.id !== setterId); const handleSelect = (playerId) => { saveToHistory(); setSetterId(playerId); setModal(null); };
+    return ( <div> <p className="mb-4">Select the new designated setter from the players on the court.</p> <div className="space-y-2 max-h-80 overflow-y-auto"> {onCourtPlayers.map(player => ( <button key={player.id} onClick={() => handleSelect(player.id)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded"> #{player.number} {player.name} </button> ))} </div> </div> );
+};
+
+const AssignSetAttemptModal = () => { const onCourtIds = [...Object.values(lineup), ...liberos].filter(Boolean);
+    const onCourtPlayers = roster.filter(p => onCourtIds.includes(p.id) && p.id !== hitContext.attackerId);
+    return ( <div> <p className="mb-4">Assign <span className="font-bold text-cyan-400">Set Attempt</span> for {hitContext.originalStat} to:</p> <div className="space-y-2 max-h-80 overflow-y-auto"> {onCourtPlayers.map(player => ( <button key={player.id} onClick={() => assignSetAttempt(player.id)} className="relative w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded"> #{player.number} {player.name} {player.id === setterId && <SetterIcon />} </button> ))} <button onClick={() => assignSetAttempt(null)} className="mt-2 w-full text-center bg-gray-600 hover:bg-gray-500 p-2 rounded">No Set</button> </div> </div> );
+};
+
+const SetLiberoServeModal = () => {
+    const onCourtPlayers = Object.values(lineup).filter(Boolean).map(pId => roster.find(p => p.id === pId));
+    return (
+        <div>
+        <p className="mb-4">Select the player who the libero will serve for in the rotation.</p>
+        <div className="space-y-2 max-h-80 overflow-y-auto">
+            {onCourtPlayers.map(player => (
+            <button key={player.id} onClick={() => handleSetLiberoServe(player.id)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">
+                #{player.number} {player.name}
+            </button>
+            ))}
+            <button onClick={() => handleSetLiberoServe(null)} className="mt-2 w-full text-center bg-gray-600 hover:bg-gray-500 p-2 rounded">None / Clear</button>
+        </div>
+        </div>
+    );
+};
+
+const AssignBlockAssistModal = () => {
+    const { primaryBlockerId } = blockContext;
+    const frontRowPositions = ['p2', 'p3', 'p4'];
+    const potentialAssisters = frontRowPositions
+        .map(pos => lineup[pos])
+        .filter(playerId => playerId && playerId !== primaryBlockerId)
+        .map(playerId => roster.find(p => p.id === playerId));
+
+    return (
+        <div>
+            <p className="mb-4">Did another player assist with the block?</p>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+                <button onClick={() => handleBlockAward(null)} className="w-full text-left bg-cyan-600 hover:bg-cyan-500 p-3 rounded font-bold">
+                    Solo Block
+                </button>
+                {potentialAssisters.map(player => (
+                    <button key={player.id} onClick={() => handleBlockAward(player.id)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">
+                        #{player.number} {player.name}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+
 // --- Main Render ---
 return (
 <div className="bg-gray-900 min-h-screen text-white font-sans p-4">
 <div className="container mx-auto max-w-6xl">
 {matchPhase === 'pre_match' && ( <div className="flex flex-col items-center justify-center h-screen"> <h1 className="text-4xl font-bold mb-4 text-cyan-400">Volleyball Stat Tracker</h1> <div className="space-y-4"> <button onClick={handleStartNewMatch} className="w-64 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg text-xl">Start New Match</button> <button onClick={loadMatchesFromFirebase} disabled={!isAuthReady} className="w-64 bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg text-xl disabled:bg-gray-700 disabled:cursor-not-allowed">Load Match</button> </div> </div> )}
 {matchPhase === 'base_rotation_setup' && <BaseRotationSetup />}
-{matchPhase === 'post_match' && ( <div className="text-center p-8"> <h1 className="text-4xl font-bold text-cyan-400 mb-4">Match Over</h1> <Scoreboard earnedPoints={earnedPoints} /> <TabbedDisplay /> <button onClick={() => setMatchPhase('pre_match')} className="mt-8 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg text-xl">Return to Main Menu</button> </div> )}
+{matchPhase === 'post_match' && ( <div className="text-center p-8"> <h1 className="text-4xl font-bold text-cyan-400 mb-4">Match Over</h1> <Scoreboard earnedPoints={earnedPoints} /> <TabbedDisplay /> <button onClick={() => { window.location.reload(); }} className="mt-8 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg text-xl">Return to Main Menu</button> </div> )}
 {matchPhase === 'lineup_setup' && <LineupSetup />}
 {matchPhase === 'playing' && (
 <>
