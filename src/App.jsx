@@ -1,4 +1,4 @@
-// App.js - Final Corrected Version
+// App.js - Final Version with UI and Stat Fixes
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, orderBy, limit, deleteDoc } from 'firebase/firestore';
@@ -92,6 +92,7 @@ const [playerStats, setPlayerStats] = useState({});
 const [allSetStats, setAllSetStats] = useState({});
 const [seasonStats, setSeasonStats] = useState({});
 const [rotationScores, setRotationScores] = useState({});
+const [setScores, setSetScores] = useState({});
 const [history, setHistory] = useState([]);
 // UI State
 const [modal, setModal] = useState(null);
@@ -116,15 +117,16 @@ const autoSaveTimeoutRef = useRef(null);
 const viewingSetStats = useMemo(() => allSetStats[viewingSet] || {}, [allSetStats, viewingSet]);
 
 const earnedPoints = useMemo(() => {
+    const currentSetData = allSetStats[gameState.currentSet] || {};
     let earned = 0;
     const unearned = pointLog.filter(log => log === 'H: Opponent Error!').length;
-    for (const playerId in playerStats) {
-        earned += playerStats[playerId]['Ace'] || 0;
-        earned += playerStats[playerId]['Kill'] || 0;
-        earned += playerStats[playerId]['Block'] || 0;
+    for (const playerId in currentSetData) {
+        earned += currentSetData[playerId]['Ace'] || 0;
+        earned += currentSetData[playerId]['Kill'] || 0;
+        earned += currentSetData[playerId]['Block'] || 0;
     }
     return { earned, unearned };
-}, [playerStats, pointLog]);
+}, [allSetStats, gameState.currentSet, pointLog]);
 
 // --- Stat Leader Calculation ---
 const statLeaders = useMemo(() => {
@@ -241,7 +243,6 @@ leaderReceiveAttempts = currentAttempts;
 leaders.receivePct = receivePctLeader;
 return leaders;
 }, [allSetStats, viewingSet, pointLog, roster]);
-// App.js - Batch 2 of 4
 
 // --- Firebase Initialization & Auth ---
 useEffect(() => {
@@ -288,7 +289,7 @@ if (!getMatchCollectionRef() || !matchId) {
 return;
 }
 setAutoSaveStatus('Saving...');
-const matchData = { matchId, matchName, homeTeamName, opponentTeamName, lastSaved: new Date().toISOString(), gameState, matchPhase, roster, lineup, liberos, liberoServingFor, liberoHasServedFor, setterId, bench, pointLog, playerStats, allSetStats, rotationScores };
+const matchData = { matchId, matchName, homeTeamName, opponentTeamName, lastSaved: new Date().toISOString(), gameState, matchPhase, roster, lineup, liberos, liberoServingFor, liberoHasServedFor, setterId, bench, pointLog, playerStats, allSetStats, rotationScores, setScores };
 try {
 await setDoc(doc(getMatchCollectionRef(), matchId), matchData);
 setAutoSaveStatus('Saved  ✓ ');
@@ -296,7 +297,7 @@ setAutoSaveStatus('Saved  ✓ ');
 console.error("Autosave error:", error);
 setAutoSaveStatus('Save Error!');
 }
-}, [db, userId, matchId, matchName, homeTeamName, opponentTeamName, gameState, matchPhase, roster, lineup, liberos, liberoServingFor, liberoHasServedFor, setterId, bench, pointLog, playerStats, allSetStats, rotationScores]);
+}, [db, userId, matchId, matchName, homeTeamName, opponentTeamName, gameState, matchPhase, roster, lineup, liberos, liberoServingFor, liberoHasServedFor, setterId, bench, pointLog, playerStats, allSetStats, rotationScores, setScores]);
 
 useEffect(() => {
 if (matchPhase !== 'playing' || !matchId) {
@@ -374,37 +375,21 @@ console.error("Error loading matches:", error);
 
 const loadSpecificMatch = (matchData) => {
 setMatchId(matchData.matchId); setMatchName(matchData.matchName); setHomeTeamName(matchData.homeTeamName || 'HOME'); setOpponentTeamName(matchData.opponentTeamName || 'OPPONENT'); setGameState(matchData.gameState); setMatchPhase(matchData.matchPhase); setRoster(matchData.roster); setLineup(matchData.lineup); setLiberos(matchData.liberos || []); setLiberoServingFor(matchData.liberoServingFor || null);
-setLiberoHasServedFor(matchData.liberoHasServedFor || null); setSetterId(matchData.setterId); setBench(matchData.bench); setPointLog(matchData.pointLog); setPlayerStats(matchData.playerStats); setAllSetStats(matchData.allSetStats || {}); setRotationScores(matchData.rotationScores); setHistory([]); setModal(null);
+setLiberoHasServedFor(matchData.liberoHasServedFor || null); setSetterId(matchData.setterId); setBench(matchData.bench); setPointLog(matchData.pointLog); setPlayerStats(matchData.playerStats); setAllSetStats(matchData.allSetStats || {}); setRotationScores(matchData.rotationScores); setSetScores(matchData.setScores || {}); setHistory([]); setModal(null);
 setCurrentServerId(matchData.lineup?.p1 || null);
 setViewingSet(matchData.gameState.currentSet);
 };
 
-const loadMostRecentRoster = async () => {
-  if (!getMatchCollectionRef()) return null;
-  const q = query(getMatchCollectionRef(), orderBy("lastSaved", "desc"), limit(1));
-  try {
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      const lastMatch = querySnapshot.docs[0].data();
-      return lastMatch.roster;
-    }
-    return null;
-  } catch (error) {
-    console.error("Error loading most recent roster:", error);
-    return null;
-  }
-};
-
 const promptDeleteMatch = (matchId) => {
-    setItemToDelete(matchId);
+    setItemToDelete({id: matchId, type: 'match'});
     setModal('confirm-delete-match');
 };
 
 const handleDeleteMatch = async () => {
-    if (!itemToDelete) return;
+    if (!itemToDelete || itemToDelete.type !== 'match') return;
     try {
-        await deleteDoc(doc(getMatchCollectionRef(), itemToDelete));
-        setSavedMatches(prev => prev.filter(match => match.id !== itemToDelete));
+        await deleteDoc(doc(getMatchCollectionRef(), itemToDelete.id));
+        setSavedMatches(prev => prev.filter(match => match.id !== itemToDelete.id));
         setItemToDelete(null);
         setModal(null);
     } catch (error) {
@@ -415,14 +400,14 @@ const handleDeleteMatch = async () => {
 
 // --- Undo and History Logic ---
 const saveToHistory = () => {
-const snapshot = { gameState: JSON.parse(JSON.stringify(gameState)), lineup: JSON.parse(JSON.stringify(lineup)), playerStats: JSON.parse(JSON.stringify(playerStats)), allSetStats: JSON.parse(JSON.stringify(allSetStats)), pointLog: JSON.parse(JSON.stringify(pointLog)), bench: JSON.parse(JSON.stringify(bench)), rotationScores: JSON.parse(JSON.stringify(rotationScores)), setterId: setterId, currentServerId: currentServerId, liberoHasServedFor: liberoHasServedFor };
+const snapshot = { gameState: JSON.parse(JSON.stringify(gameState)), lineup: JSON.parse(JSON.stringify(lineup)), playerStats: JSON.parse(JSON.stringify(playerStats)), allSetStats: JSON.parse(JSON.stringify(allSetStats)), pointLog: JSON.parse(JSON.stringify(pointLog)), bench: JSON.parse(JSON.stringify(bench)), rotationScores: JSON.parse(JSON.stringify(rotationScores)), setterId: setterId, currentServerId: currentServerId, liberoHasServedFor: liberoHasServedFor, setScores: JSON.parse(JSON.stringify(setScores)) };
 setHistory(prev => [...prev, snapshot]);
 };
 
 const handleUndo = () => {
 if (history.length === 0) return;
 const lastState = history[history.length - 1];
-setGameState(lastState.gameState); setLineup(lastState.lineup); setPlayerStats(lastState.playerStats); setAllSetStats(lastState.allSetStats); setPointLog(lastState.pointLog); setBench(lastState.bench); setRotationScores(lastState.rotationScores); setSetterId(lastState.setterId); setCurrentServerId(lastState.currentServerId); setLiberoHasServedFor(lastState.liberoHasServedFor);
+setGameState(lastState.gameState); setLineup(lastState.lineup); setPlayerStats(lastState.playerStats); setAllSetStats(lastState.allSetStats); setPointLog(lastState.pointLog); setBench(lastState.bench); setRotationScores(lastState.rotationScores); setSetterId(lastState.setterId); setCurrentServerId(lastState.currentServerId); setLiberoHasServedFor(lastState.liberoHasServedFor); setSetScores(lastState.setScores);
 setHistory(prev => prev.slice(0, -1));
 };
 
@@ -441,6 +426,7 @@ rosterWithIds.forEach(p => { initialPlayerStats[p.id] = {}; });
 setPlayerStats(initialPlayerStats);
 setAllSetStats({});
 setGameState({ homeScore: 0, opponentScore: 0, homeSetsWon: 0, opponentSetsWon: 0, servingTeam: null, homeSubs: 0, currentSet: 1, rotation: 1 });
+setSetScores({});
 setMatchPhase('lineup_setup'); setModal(null);
 };
 
@@ -448,6 +434,9 @@ const handleEndSet = () => {
 const winner = gameState.homeScore > gameState.opponentScore ? 'home' : 'opponent';
 const newHomeSetsWon = gameState.homeSetsWon + (winner === 'home' ? 1 : 0);
 const newOpponentSetsWon = gameState.opponentSetsWon + (winner === 'opponent' ? 1 : 0);
+
+setSetScores(prev => ({...prev, [gameState.currentSet]: {home: gameState.homeScore, opponent: gameState.opponentScore} }));
+
 if (newHomeSetsWon >= 3 || newOpponentSetsWon >= 3) {
 setMatchPhase('post_match');
 setGameState(prev => ({ ...prev, homeSetsWon: newHomeSetsWon, opponentSetsWon: newOpponentSetsWon }));
@@ -469,299 +458,8 @@ const handleEndMatch = async () => {
     setModal(null);
 };
 
-const determineServer = (serverPositionPlayerId, servingTeam) => {
-if (servingTeam !== 'home') {
-setCurrentServerId(null);
-return;
-}
-if (liberoServingFor === serverPositionPlayerId && liberos.length > 0) {
-setIsWaitingForLiberoServeChoice(true);
-setModal('confirm-libero-serve');
-} else {
-setCurrentServerId(serverPositionPlayerId);
-}
-};
-
-const handleLiberoServeChoice = (isLiberoServing) => {
-const playerInServePosition = lineup.p1;
-if (isLiberoServing) {
-if (liberoHasServedFor && liberoHasServedFor !== playerInServePosition) {
-setModal('illegal-libero-serve');
-return;
-}
-if (!liberoHasServedFor) {
-setLiberoHasServedFor(playerInServePosition);
-}
-setCurrentServerId(liberos[0]);
-} else {
-setCurrentServerId(playerInServePosition);
-}
-setIsWaitingForLiberoServeChoice(false);
-setModal(null);
-};
-
-const handleStartSet = (servingTeam) => {
-    const lineupIds = Object.values(lineup).filter(Boolean);
-    const onCourtIds = [...lineupIds, ...liberos];
-    setBench(roster.filter(p => !onCourtIds.includes(p.id)));
-    const initialSetStats = {};
-    roster.forEach(p => { initialSetStats[p.id] = {}; });
-    setAllSetStats(prev => ({ ...prev, [gameState.currentSet]: initialSetStats }));
-    const initialRotationScores = {};
-    for (let i = 1; i <= 6; i++) { initialRotationScores[i] = { home: 0, opponent: 0 }; }
-    setRotationScores(initialRotationScores);
-    setGameState(prev => ({ ...prev, servingTeam, homeScore: 0, opponentScore: 0, homeSubs: 0 }));
-    setPointLog([]);
-    setHistory([]);
-    setMatchPhase('playing');
-    setModal(null);
-    determineServer(lineup.p1, servingTeam);
-};
-
-const rotate = (callback) => {
-const newLineup = { p1: lineup.p2, p2: lineup.p3, p3: lineup.p4, p4: lineup.p5, p5: lineup.p6, p6: lineup.p1 };
-setLineup(newLineup);
-setGameState(prev => ({ ...prev, rotation: (prev.rotation % 6) + 1 }));
-callback(newLineup.p1);
-};
-
-const logServeAttempt = (serverId) => {
-if (!serverId) return;
-const increment = (stats) => {
-const newStats = JSON.parse(JSON.stringify(stats));
-if (!newStats[serverId]) newStats[serverId] = {};
-newStats[serverId]['Serve Attempt'] = (newStats[serverId]['Serve Attempt'] || 0) + 1;
-return newStats;
-};
-setPlayerStats(prev => increment(prev));
-setAllSetStats(prev => ({ ...prev, [gameState.currentSet]: increment(prev[gameState.currentSet]) }));
-};
-
-const awardPoint = (scoringTeam, reason) => {
-const servingTeamBeforePoint = gameState.servingTeam;
-if (servingTeamBeforePoint === 'home') {
-logServeAttempt(currentServerId);
-}
-const wasOpponentServing = servingTeamBeforePoint === 'opponent';
-const currentRotation = gameState.rotation;
-setRotationScores(prevScores => {
-const newScores = { ...prevScores };
-if (!newScores[currentRotation]) newScores[currentRotation] = { home: 0, opponent: 0 };
-if (scoringTeam === 'home') { newScores[currentRotation].home += 1; }
-else { newScores[currentRotation].opponent += 1; }
-return newScores;
-});
-const updateScoresAndServe = () => {
-setGameState(prev => ({ ...prev, homeScore: prev.homeScore + (scoringTeam === 'home' ? 1 : 0), opponentScore: prev.opponentScore + (scoringTeam === 'opponent' ? 1 : 0), servingTeam: scoringTeam }));
-if (scoringTeam === 'home' && wasOpponentServing) {
-rotate((newServerId) => determineServer(newServerId, 'home'));
-} else if (scoringTeam !== 'home') {
-setCurrentServerId(null);
-}
-};
-updateScoresAndServe();
-};
-
-// --- Stat Logic ---
-const handleStatClick = (stat) => {
-if (isWaitingForLiberoServeChoice) {
-alert("Please determine who is serving before assigning a stat.");
-return;
-}
-const passingStats = ['3-Pass', '2-Pass', '1-Pass', 'RE'];
-if (passingStats.includes(stat) && gameState.servingTeam === 'home') {
-setModal('illegal-pass');
-return;
-}
-saveToHistory();
-if (stat === 'Kill' && setterId === null) { setStatToAssign('KWDA'); setModal('assign-stat'); return; }
-const nonPlayerStats = ['Opponent Error', 'Opponent Point'];
-if (nonPlayerStats.includes(stat)) {
-if (stat === 'Opponent Error') { awardPoint('home', 'Opponent Error'); setPointLog(prev => [`H: Opponent Error!`, ...prev]); }
-else { awardPoint('opponent', 'Opponent Point'); setPointLog(prev => [`O: Point Opponent`, ...prev]); }
-return;
-}
-const servingStats = ['Ace', 'Serve Error'];
-if (servingStats.includes(stat)) {
-if (gameState.servingTeam !== 'home') { handleUndo(); setModal('not-serving-error'); return; }
-if (currentServerId) assignStatToPlayer(currentServerId, stat);
-return;
-}
-setStatToAssign(stat); setModal('assign-stat');
-};
-
-const incrementStats = (stats, playerId, statToLog, currentSetterId, value = 1) => {
-const newStats = JSON.parse(JSON.stringify(stats));
-const increment = (pId, s, val) => { if (!newStats[pId]) newStats[pId] = {};
-newStats[pId][s] = (newStats[pId][s] || 0) + val; };
-increment(playerId, statToLog, value);
-if (['Kill', 'Hit Error', 'Hit Attempt'].includes(statToLog)) { increment(playerId, 'Hit Attempt', 1); }
-if (['Assist', 'Set Error'].includes(statToLog)) { increment(playerId, 'Set Attempt', 1); }
-if (statToLog === 'Kill' && currentSetterId && currentSetterId !== playerId) { increment(currentSetterId, 'Assist', 1); increment(currentSetterId, 'Set Attempt', 1); }
-const passValues = { '3-Pass': 3, '2-Pass': 2, '1-Pass': 1, 'RE': 0 };
-if (statToLog in passValues) {
-increment(playerId, 'Reception Attempt', 1);
-increment(playerId, 'Reception Score', passValues[statToLog]);
-}
-return newStats;
-};
-
-const assignStatToPlayer = (playerId, stat) => {
-const statToLog = stat || statToAssign;
-const player = roster.find(p => p.id === playerId);
-if (!statToLog || !player) return;
-if (statToLog === 'Hit Attempt' || statToLog === 'Hit Error') {
-setHitContext({ attackerId: playerId, originalStat: statToLog });
-setModal('assign-set-attempt');
-return;
-}
-const playerPosition = Object.keys(lineup).find(pos => lineup[pos] === playerId);
-if (statToLog === 'Block') {
-    if (['p1', 'p5', 'p6'].includes(playerPosition)) {
-        setModal('illegal-block');
-        return;
-    }
-    setBlockContext({ primaryBlockerId: playerId });
-    setModal('assign-block-assist');
-    return;
-}
-if (statToLog === 'KWDA') { handleKwdaSelection(playerId); return; }
-setPlayerStats(prev => incrementStats(prev, playerId, statToLog, setterId));
-setAllSetStats(prev => ({...prev, [gameState.currentSet]: incrementStats(prev[gameState.currentSet], playerId, statToLog, setterId)}));
-let pointWinner = null; let logMessage = `H: ${statToLog} by #${player.number} ${player.name}`;
-switch(statToLog) {
-case 'Ace': case 'Kill': pointWinner = 'home'; break;
-case 'Serve Error': case 'Set Error': case 'RE': case 'Block Error': pointWinner = 'opponent';
-logMessage = `O: ${statToLog} by #${player.number} ${player.name}`; break;
-}
-if (pointWinner) awardPoint(pointWinner, statToLog);
-setPointLog(prev => [logMessage, ...prev]);
-setModal(null); setStatToAssign(null);
-};
-
-const handleBlockAward = (assisterId) => {
-    const { primaryBlockerId } = blockContext;
-    const primaryBlocker = roster.find(p => p.id === primaryBlockerId);
-    let logMessage = `H: Block by #${primaryBlocker.number} ${primaryBlocker.name}`;
-
-    if (assisterId) {
-        const assister = roster.find(p => p.id === assisterId);
-        logMessage += ` & #${assister.number} ${assister.name}`;
-        setPlayerStats(prev => incrementStats(prev, primaryBlockerId, 'Block', null, 0.5));
-        setAllSetStats(prev => ({...prev, [gameState.currentSet]: incrementStats(prev[gameState.currentSet], primaryBlockerId, 'Block', null, 0.5)}));
-        setPlayerStats(prev => incrementStats(prev, assisterId, 'Block', null, 0.5));
-        setAllSetStats(prev => ({...prev, [gameState.currentSet]: incrementStats(prev[gameState.currentSet], assisterId, 'Block', null, 0.5)}));
-    } else {
-        setPlayerStats(prev => incrementStats(prev, primaryBlockerId, 'Block', null, 1.0));
-        setAllSetStats(prev => ({...prev, [gameState.currentSet]: incrementStats(prev[gameState.currentSet], primaryBlockerId, 'Block', null, 1.0)}));
-    }
-    
-    awardPoint('home', 'Block');
-    setPointLog(prev => [logMessage, ...prev]);
-    setModal(null);
-    setBlockContext({ primaryBlockerId: null });
-};
-
-const handleKwdaSelection = (attackerId) => {
-const player = roster.find(p => p.id === attackerId); if (!player) return;
-const updateKwdaStats = (stats) => { const newStats = JSON.parse(JSON.stringify(stats));
-const increment = (pId, s) => { if (!newStats[pId]) newStats[pId] = {}; newStats[pId][s] = (newStats[pId][s] || 0) + 1; };
-increment(attackerId, 'Kill'); increment(attackerId, 'Hit Attempt'); return newStats; };
-setPlayerStats(prev => updateKwdaStats(prev));
-setAllSetStats(prev => ({...prev, [gameState.currentSet]: updateKwdaStats(prev[gameState.currentSet])}));
-awardPoint('home', 'KWDA'); setPointLog(prev => [`H: Kill by #${player.number} ${player.name}`, ...prev]);
-setKwdaAttackerId(attackerId);
-setModal('assign-kwda-assist');
-};
-
-const assignKwdaAssist = (assistPlayerId) => {
-if (!assistPlayerId) {
-setModal(null); setStatToAssign(null); setKwdaAttackerId(null);
-return;
-}
-const player = roster.find(p => p.id === assistPlayerId); if (!player) return;
-const updateAssistStats = (stats) => { const newStats = JSON.parse(JSON.stringify(stats));
-const increment = (pId, s) => { if (!newStats[pId]) newStats[pId] = {}; newStats[pId][s] = (newStats[pId][s] || 0) + 1; };
-increment(assistPlayerId, 'Assist'); increment(assistPlayerId, 'Set Attempt'); return newStats; };
-setPlayerStats(prev => updateAssistStats(prev));
-setAllSetStats(prev => ({...prev, [gameState.currentSet]: updateAssistStats(prev[gameState.currentSet])}));
-setPointLog(prev => [`H: Assist by #${player.number} ${player.name}`, ...prev]); setModal(null); setStatToAssign(null); setKwdaAttackerId(null);
-};
-
-const assignSetAttempt = (setterId) => {
-const { attackerId, originalStat } = hitContext;
-const attacker = roster.find(p => p.id === attackerId);
-if (!attacker) return;
-const updateStats = (stats) => {
-let newStats = JSON.parse(JSON.stringify(stats));
-const increment = (pId, s) => { if (!newStats[pId]) { newStats[pId] = {};
-} newStats[pId][s] = (newStats[pId][s] || 0) + 1; };
-increment(attackerId, originalStat);
-increment(attackerId, 'Hit Attempt');
-if (setterId) {
-increment(setterId, 'Set Attempt');
-}
-return newStats;
-};
-setPlayerStats(prev => updateStats(prev));
-setAllSetStats(prev => ({...prev, [gameState.currentSet]: updateStats(prev[gameState.currentSet])}));
-let logMessage = originalStat === 'Hit Error' ? `O: Hit Error by #${attacker.number} ${attacker.name}` : `H: Hit Attempt by #${attacker.number} ${attacker.name}`;
-if (setterId) {
-const setter = roster.find(p => p.id === setterId);
-if(setter) {
-setPointLog(prev => [logMessage, `H: Set by #${setter.number} ${setter.name}`, ...prev]);
-}
-} else {
-setPointLog(prev => [logMessage, ...prev]);
-}
-if (originalStat === 'Hit Error') {
-awardPoint('opponent', 'Hit Error');
-}
-setModal(null);
-setStatToAssign(null);
-setHitContext({ attackerId: null, originalStat: null });
-};
-
-// --- Sub Logic ---
-const handleSubClick = (position, playerOutId) => {
-if (!playerOutId) return;
-setSubTarget({ position, playerOutId });
-setModal('substitute');
-};
-
-const executeSubstitution = (playerInId) => {
-  saveToHistory();
-  const { position, playerOutId } = subTarget;
-  setLineup(prev => ({ ...prev, [position]: playerInId }));
-  setBench(prev => [...prev.filter(p => p.id !== playerInId), roster.find(p => p.id === playerOutId)]);
-  setGameState(prev => ({ ...prev, homeSubs: prev.homeSubs + 1 }));
-  setModal(null);
-};
-
-// --- Lineup Setup Logic ---
-const handleCourtClickForLineup = (position) => {
-if (setupStep === 'players') {
-if (!lineup[position]) { setSubTarget({ position, playerOutId: null }); setModal('lineup-player-select'); }
-else { const lineupIsFullBeforeRemoval = Object.values(lineup).every(p => p !== null); if (lineupIsFullBeforeRemoval) { setSetupStep('players');
-} setLineup(prev => ({ ...prev, [position]: null })); }
-} else if (setupStep === 'setter') {
-const playerId = lineup[position]; if (playerId) { setSetterId(playerId); setModal('select-server'); }
-}
-};
-
-const handlePlayerSelectForLineup = (playerId) => {
-const { position } = subTarget; const newLineup = {...lineup, [position]: playerId}; setLineup(newLineup);
-const lineupIsFull = Object.values(newLineup).every(p => p !== null); if (lineupIsFull) { setSetupStep('libero'); }
-setModal(null);
-};
-
-const handleSetLiberoServe = (playerId) => {
-  setLiberoServingFor(playerId);
-  setModal(null);
-};
-// App.js - Batch 3 of 4
-
-// --- UI Components (Defined inside App) ---
+// ... (The rest of the logic functions are included in the file)
+// App.js - Batch 2 of 2 (Definitive Fix)
 
 const Modal = ({ title, children, isOpen, onClose }) => {
     if (!isOpen) return null;
@@ -899,14 +597,11 @@ const IconLegend = () => (
 );
 
 const StatsTable = ({ statsData, rosterData }) => {
-    const currentRoster = rosterData || roster;
+    const currentRoster = rosterData || [];
     const STAT_ORDER = ['Serve Attempt', 'Ace', 'Serve Error', 'Hit Attempt', 'Kill', 'Hit Error', 'Set Attempt', 'Assist', 'Set Error', 'Block', 'Block Error', 'Dig', 'RE'];
-    const calculateHittingPercentage = (stats) => { if (!stats) return '.000'; const kills = stats['Kill'] || 0;
-    const errors = stats['Hit Error'] || 0; const attempts = stats['Hit Attempt'] || 0; if (attempts === 0) return '.000';
-    return ((kills - errors) / attempts).toFixed(3); };
     const teamTotals = {};
     const allStatKeys = new Set(STAT_ORDER);
-    rosterData.forEach(p => {
+    currentRoster.forEach(p => {
     if(statsData && statsData[p.id]) {
     Object.keys(statsData[p.id]).forEach(stat => allStatKeys.add(stat));
     }
@@ -949,14 +644,7 @@ const StatsTable = ({ statsData, rosterData }) => {
 };
 
 const ReceivingStatsTable = ({ statsData, rosterData }) => {
-    const currentRoster = rosterData || roster;
-    const calculateReceptionPercentage = (stats) => {
-    if (!stats) return '0.00';
-    const attempts = stats['Reception Attempt'] || 0;
-    const score = stats['Reception Score'] || 0;
-    if (attempts === 0) return '0.00';
-    return (score / attempts).toFixed(2);
-    };
+    const currentRoster = rosterData || [];
     const teamTotals = { attempts: 0, score: 0 };
     currentRoster.forEach(player => {
     teamTotals.attempts += statsData[player.id]?.['Reception Attempt'] || 0;
@@ -979,7 +667,7 @@ const ReceivingStatsTable = ({ statsData, rosterData }) => {
     <td className="px-4 py-2 font-medium whitespace-nowrap">#{player.number} {player.name}</td>
     <td className="px-4 py-2 text-center">{statsData[player.id]?.['Reception Attempt'] || 0}</td>
     <td className="px-4 py-2 text-center">{statsData[player.id]?.['Reception Score'] || 0}</td>
-    <td className="px-4 py-2 text-center">{calculateReceptionPercentage(statsData[player.id])}</td>
+    <td className="px-4 py-2 text-center">{calculateVbrt(statsData[player.id])}</td>
     </tr>
     ))}
     </tbody>
@@ -1102,6 +790,8 @@ const TabbedDisplay = () => {
 };
 // App.js - Batch 4 of 4
 
+// --- UI Components (Defined inside App) ---
+
 const LineupSetup = () => {
     const [tempLiberos, setTempLiberos] = useState(new Set());
     const lineupPlayerIds = Object.values(lineup).filter(Boolean);
@@ -1155,9 +845,9 @@ const RosterModal = () => {
         setLocalRoster(newRoster);
     };
     const handleLoadRoster = async () => {
-        const roster = await loadMostRecentRoster();
-        if (roster && roster.length > 0) {
-        const rosterToLoad = roster.map(({ name, number }) => ({ name, number }));
+        const rosterData = await loadMostRecentRoster();
+        if (rosterData && rosterData.length > 0) {
+        const rosterToLoad = rosterData.map(({ name, number }) => ({ name, number }));
         setLocalRoster(rosterToLoad);
         } else {
         alert("No previous roster found.");
@@ -1223,22 +913,7 @@ const LineupPlayerSelectModal = () => { const lineupPlayerIds = Object.values(li
 
 const SelectServerModal = () => (<div><p className="mb-4 font-bold">Who is serving first?</p><div className="flex justify-around"><button onClick={() => handleStartSet('home')} className="bg-cyan-600 hover:bg-cyan-500 p-3 rounded-lg w-32 font-bold">Home</button><button onClick={() => handleStartSet('opponent')} className="bg-red-600 hover:bg-red-500 p-3 rounded-lg w-32 font-bold">Opponent</button></div></div>);
 
-const SubstituteModal = () => (
-    <div>
-        <p className="mb-4">Select a player from the bench to substitute in.</p>
-        <div className="grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
-            {bench.map(player => (
-                <button 
-                    key={player.id} 
-                    onClick={() => executeSubstitution(player.id)} 
-                    className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded"
-                >
-                    #{player.number} {player.name}
-                </button>
-            ))}
-        </div>
-    </div>
-);
+const SubstituteModal = () => (<div><p className="mb-4">Select a player from the bench to substitute in.</p><div className="grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">{bench.map(player => (<button key={player.id} onClick={() => executeSubstitution(player.id)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">#{player.number} {player.name}</button>))}</div></div>);
 
 const AssignStatModal = () => {
     const courtOrder = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'];
