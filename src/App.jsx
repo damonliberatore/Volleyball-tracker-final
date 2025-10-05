@@ -1352,7 +1352,15 @@ const LoadMatchModal = () => (
 const LineupPlayerSelectModal = () => { const lineupPlayerIds = Object.values(lineup).filter(Boolean); const availablePlayers = roster.filter(p => !lineupPlayerIds.includes(p.id));
     return (<div><p className="mb-4">Select a player for position <span className="font-bold text-cyan-400">{subTarget.position?.toUpperCase()}</span></p><div className="space-y-2 max-h-80 overflow-y-auto">{availablePlayers.map(player => (<button key={player.id} onClick={() => handlePlayerSelectForLineup(player.id)} className="w-full text-left bg-gray-700 hover:bg-gray-600 p-3 rounded">#{player.number} {player.name}</button>))}</div></div>);
 };
-
+const SelectServerModal = () => (
+    <div>
+        <p className="mb-4 font-bold">Who is serving first?</p>
+        <div className="flex justify-around">
+            <button onClick={() => handleStartSet('home')} className="bg-cyan-600 hover:bg-cyan-500 p-3 rounded-lg w-32 font-bold">Home</button>
+            <button onClick={() => handleStartSet('opponent')} className="bg-red-600 hover:bg-red-500 p-3 rounded-lg w-32 font-bold">Opponent</button>
+        </div>
+    </div>
+);
 // --- Main Render ---
 return (
 <div className="bg-gray-900 min-h-screen text-white font-sans p-4">
