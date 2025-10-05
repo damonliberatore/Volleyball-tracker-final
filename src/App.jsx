@@ -1393,7 +1393,38 @@ return (
 <Modal title="Enter Roster & Match Info" isOpen={modal === 'roster'} onClose={() => setModal(null)}><RosterModal /></Modal>
 <Modal title="Load Match" isOpen={modal === 'load-match'} onClose={() => setModal(null)}><LoadMatchModal /></Modal>
 <Modal title="Select Player" isOpen={modal === 'lineup-player-select'} onClose={() => setModal(null)}><LineupPlayerSelectModal /></Modal>
-{/* ... All other modals from your original code ... */}
+<Modal title="Select First Server" isOpen={modal === 'select-server'} onClose={() => setModal(null)}><SelectServerModal /></Modal>
+<Modal title="Substitute Player" isOpen={modal === 'substitute'} onClose={() => setModal(null)}><SubstituteModal /></Modal>
+<Modal title="Assign Stat" isOpen={modal === 'assign-stat'} onClose={() => setModal(null)}><AssignStatModal /></Modal>
+<Modal title="Assign Assist for Kill" isOpen={modal === 'assign-kwda-assist'} onClose={() => setModal(null)}><AssignKwdaAssistModal /></Modal>
+<Modal title="Assign Set Attempt" isOpen={modal === 'assign-set-attempt'} onClose={() => setModal(null)}><AssignSetAttemptModal /></Modal>
+<Modal title="Select New Setter" isOpen={modal === 'select-new-setter'} onClose={() => setModal(null)}><SelectNewSetterModal /></Modal>
+<Modal title="Set Libero to Serve For" isOpen={modal === 'set-libero-serve'} onClose={() => setModal(null)}><SetLiberoServeModal /></Modal>
+<Modal title="Assign Block Assist" isOpen={modal === 'assign-block-assist'} onClose={() => setModal(null)}><AssignBlockAssistModal /></Modal>
+<Modal title="Is the Libero Serving?" isOpen={modal === 'confirm-libero-serve'} onClose={() => {}}>
+<p className="mb-4">The designated player is in the serving position. Should the libero serve for them?</p>
+<div className="flex justify-around"> <button onClick={() => handleLiberoServeChoice(true)} className="bg-green-600 hover:bg-green-500 p-3 rounded-lg w-32 font-bold">Yes</button> <button onClick={() => handleLiberoServeChoice(false)} className="bg-red-600 hover:bg-red-500 p-3 rounded-lg w-32 font-bold">No</button> </div>
+</Modal>
+<Modal title="Error" isOpen={modal === 'not-serving-error'} onClose={() => setModal(null)}> <p>Cannot assign a serving stat when your team is not serving.</p> </Modal>
+<Modal title="Error" isOpen={modal === 'illegal-pass'} onClose={() => setModal(null)}> <p>Cannot assign a passing stat when your team is serving.</p> </Modal>
+<Modal title="Illegal Action" isOpen={modal === 'illegal-block'} onClose={() => setModal(null)}> <p>Back row players can't get a block stat - this is Illegal.</p> </Modal>
+<Modal title="Illegal Libero Serve" isOpen={modal === 'illegal-libero-serve'} onClose={() => setModal(null)}> <p>This is an illegal serve. The libero has already served for a different player in this set.</p> </Modal>
+<Modal title="Confirm End Set" isOpen={modal === 'end-set-confirm'} onClose={() => setModal(null)}> <p className="mb-4">Are you sure you want to end the current set? The scores will be recorded and you will proceed to the next set's lineup.</p> <div className="flex justify-end space-x-4"> <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button> <button onClick={handleEndSet} className="bg-red-600 hover:bg-red-500 p-2 px-4 rounded">End Set</button> </div> </Modal>
+<Modal title="Confirm Setter Change" isOpen={modal === 'change-setter-confirm'} onClose={() => setModal(null)}> <p className="mb-4">Are you sure you want to change the designated setter mid-set? This action can be undone.</p> <div className="flex justify-end space-x-4"> <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button> <button onClick={() => setModal('select-new-setter')} className="bg-yellow-600 hover:bg-yellow-500 p-2 px-4 rounded">Change Setter</button> </div> </Modal>
+<Modal title="Confirm End Match" isOpen={modal === 'confirm-end-match'} onClose={() => setModal(null)}>
+    <p className="mb-4">Are you sure you want to end the match now? The current stats will be saved.</p>
+    <div className="flex justify-end space-x-4">
+        <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button>
+        <button onClick={handleEndMatch} className="bg-red-600 hover:bg-red-500 p-2 px-4 rounded">End Match</button>
+    </div>
+</Modal>
+<Modal title="Confirm Deletion" isOpen={modal === 'confirm-delete-match'} onClose={() => setModal(null)}>
+    <p className="mb-4">Are you sure you want to permanently delete this match and all of its stats?</p>
+    <div className="flex justify-end space-x-4">
+        <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button>
+        <button onClick={handleDeleteMatch} className="bg-red-600 hover:bg-red-500 p-2 px-4 rounded">Delete Match</button>
+    </div>
+</Modal>
 </div>
 </div>
 );
