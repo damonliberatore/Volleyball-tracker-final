@@ -1,7 +1,7 @@
 // App.js - Final Corrected Version
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, orderBy, limit, deleteDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, orderBy, limit, deleteDoc, addDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 
 // --- Helper Components (Stateless) ---
@@ -86,8 +86,10 @@ const calculateRotationLineup = (baseLineup, targetRotation) => {
 // --- Main App Component ---
 export default function App() {
 // --- State Management ---
+const [teams, setTeams] = useState([]);
+const [selectedTeamId, setSelectedTeamId] = useState(null);
 const [gameState, setGameState] = useState({ homeScore: 0, opponentScore: 0, homeSetsWon: 0, opponentSetsWon: 0, servingTeam: null, homeSubs: 0, currentSet: 1, rotation: 1 });
-const [matchPhase, setMatchPhase] = useState('pre_match');
+const [matchPhase, setMatchPhase] = useState('team_selection'); // New initial phase
 const [matchId, setMatchId] = useState(null);
 const [matchName, setMatchName] = useState('');
 const [homeTeamName, setHomeTeamName] = useState('HOME');
@@ -258,7 +260,7 @@ leaderReceiveAttempts = currentAttempts;
 leaders.receivePct = receivePctLeader;
 return leaders;
 }, [allSetStats, viewingSet, pointLog, roster]);
-// App.js - Batch 2 of 4
+// App.js - Batch 2 of 3
 
 // --- Firebase Initialization & Auth ---
 useEffect(() => {
@@ -293,12 +295,47 @@ try {
 }
 }, []);
 
+// Fetch teams once user is authenticated
+useEffect(() => {
+    if (isAuthReady && userId) {
+        loadTeamsFromFirebase();
+    }
+}, [isAuthReady, userId]);
+
+
 // --- Data Persistence ---
-const getMatchCollectionRef = useCallback(() => {
-if (!db || !userId) return null;
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-return collection(db, 'artifacts', appId, 'users', userId, 'matches');
+const getTeamCollectionRef = useCallback(() => {
+    if (!db || !userId) return null;
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    return collection(db, 'artifacts', appId, 'users', userId, 'teams');
 }, [db, userId]);
+
+const getMatchCollectionRef = useCallback(() => {
+    if (!getTeamCollectionRef() || !selectedTeamId) return null;
+    return collection(getTeamCollectionRef(), selectedTeamId, 'matches');
+}, [getTeamCollectionRef, selectedTeamId]);
+
+
+const loadTeamsFromFirebase = async () => {
+    if (!getTeamCollectionRef()) return;
+    try {
+        const querySnapshot = await getDocs(getTeamCollectionRef());
+        const teamList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setTeams(teamList);
+    } catch (error) {
+        console.error("Error loading teams:", error);
+    }
+};
+
+const handleCreateTeam = async (teamName) => {
+    if (!getTeamCollectionRef() || !teamName.trim()) return;
+    try {
+        const newTeamDoc = await addDoc(getTeamCollectionRef(), { name: teamName.trim() });
+        setTeams(prev => [...prev, { id: newTeamDoc.id, name: teamName.trim() }]);
+    } catch (error) {
+        console.error("Error creating team:", error);
+    }
+};
 
 const autoSaveMatchToFirebase = useCallback(async () => {
 if (!getMatchCollectionRef() || !matchId) {
@@ -313,7 +350,7 @@ setAutoSaveStatus('Saved   ✓ ');
 console.error("Autosave error:", error);
 setAutoSaveStatus('Save Error!');
 }
-}, [db, userId, matchId, matchName, homeTeamName, opponentTeamName, gameState, matchPhase, roster, lineup, baseRotationLineup, liberos, liberoServingFor, liberoHasServedFor, setterId, bench, pointLog, playerStats, allSetStats, rotationScores]);
+}, [getMatchCollectionRef, matchId, matchName, homeTeamName, opponentTeamName, gameState, matchPhase, roster, lineup, baseRotationLineup, liberos, liberoServingFor, liberoHasServedFor, setterId, bench, pointLog, playerStats, allSetStats, rotationScores]);
 
 useEffect(() => {
 if (matchPhase !== 'playing' || !matchId) {
@@ -418,7 +455,7 @@ const promptDeleteMatch = (matchId) => {
 };
 
 const handleDeleteMatch = async () => {
-    if (!itemToDelete) return;
+    if (!itemToDelete || !getMatchCollectionRef()) return;
     try {
         await deleteDoc(doc(getMatchCollectionRef(), itemToDelete));
         setSavedMatches(prev => prev.filter(match => match.id !== itemToDelete));
@@ -428,6 +465,17 @@ const handleDeleteMatch = async () => {
         console.error("Error deleting match:", error);
         alert("Could not delete match.");
     }
+};
+
+// --- Team Selection Logic ---
+const handleSelectTeam = (teamId) => {
+    setSelectedTeamId(teamId);
+    setMatchPhase('pre_match');
+};
+
+const handleGoBackToTeams = () => {
+    setSelectedTeamId(null);
+    setMatchPhase('team_selection');
 };
 
 // --- Undo and History Logic ---
@@ -611,7 +659,7 @@ setCurrentServerId(null);
 };
 updateScoresAndServe();
 };
-// App.js - Batch 3 of 4
+// App.js - Batch 3 of 3
 // --- Stat Logic ---
 const handleStatClick = (stat) => {
 if (isWaitingForLiberoServeChoice) {
@@ -908,7 +956,7 @@ const Scoreboard = ({ earnedPoints }) => {
     </div>
     );
 };
-// App.js - Batch 4 of 4
+
 const StatButton = ({ label, onClick, type }) => { const colors = { positive: 'bg-green-600 hover:bg-green-500', neutral: 'bg-blue-600 hover:bg-blue-500', negative: 'bg-red-600 hover:bg-red-500' };
     return (<button onClick={onClick} className={`text-white font-bold py-2 px-1 rounded-lg shadow-md transition-transform transform hover:scale-105 text-sm ${colors[type]}`}>{label}</button>); };
 
@@ -1154,6 +1202,48 @@ const TabbedDisplay = () => {
     );
 };
 
+const TeamSelection = () => {
+    const [newTeamName, setNewTeamName] = useState('');
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        handleCreateTeam(newTeamName);
+        setNewTeamName('');
+    };
+    
+    return (
+        <div className="flex flex-col items-center justify-center h-screen">
+            <h1 className="text-4xl font-bold mb-4 text-cyan-400">Select a Team</h1>
+            <div className="w-full max-w-md">
+                <div className="bg-gray-800 p-4 rounded-lg shadow-lg mb-4">
+                    <h2 className="text-xl text-white font-bold mb-3">Your Teams</h2>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {teams.length > 0 ? teams.map(team => (
+                            <button key={team.id} onClick={() => handleSelectTeam(team.id)} className="w-full text-left bg-gray-700 hover:bg-cyan-600 p-3 rounded transition-colors">
+                                {team.name}
+                            </button>
+                        )) : <p className="text-gray-400">You haven't created any teams yet.</p>}
+                    </div>
+                </div>
+                <form onSubmit={handleSubmit} className="bg-gray-800 p-4 rounded-lg shadow-lg">
+                    <h2 className="text-xl text-white font-bold mb-3">Create New Team</h2>
+                    <div className="flex space-x-2">
+                        <input 
+                            type="text" 
+                            value={newTeamName}
+                            onChange={(e) => setNewTeamName(e.target.value)}
+                            placeholder="e.g., Varsity Girls"
+                            className="bg-gray-700 p-2 rounded w-full flex-grow"
+                            required
+                        />
+                        <button type="submit" className="bg-green-600 hover:bg-green-500 p-2 px-4 rounded font-bold">Create</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 const BaseRotationSetup = () => {
     const handleCourtClick = (position) => {
         if (!lineup[position]) {
@@ -1292,7 +1382,7 @@ const RosterModal = () => {
         const rosterToLoad = roster.map(({ name, number }) => ({ name, number }));
         setLocalRoster(rosterToLoad);
         } else {
-        alert("No previous roster found.");
+        alert("No previous roster found for this team.");
         }
     };
     const handleSubmit = (e) => {
@@ -1473,10 +1563,17 @@ const AssignBlockAssistModal = () => {
 return (
 <div className="bg-gray-900 min-h-screen text-white font-sans p-4">
 <div className="container mx-auto max-w-6xl">
-{matchPhase === 'pre_match' && ( <div className="flex flex-col items-center justify-center h-screen"> <h1 className="text-4xl font-bold mb-4 text-cyan-400">Volleyball Stat Tracker</h1> <div className="space-y-4"> <button onClick={handleStartNewMatch} className="w-64 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg text-xl">Start New Match</button> <button onClick={loadMatchesFromFirebase} disabled={!isAuthReady} className="w-64 bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg text-xl disabled:bg-gray-700 disabled:cursor-not-allowed">Load Match</button> </div> </div> )}
+
+{matchPhase === 'team_selection' && <TeamSelection />}
+
+{matchPhase === 'pre_match' && ( <div className="flex flex-col items-center justify-center h-screen"> <h1 className="text-4xl font-bold mb-4 text-cyan-400">Volleyball Stat Tracker</h1> <p className="text-lg text-gray-300 mb-6">Selected Team: <span className="font-bold">{teams.find(t => t.id === selectedTeamId)?.name}</span></p> <div className="space-y-4"> <button onClick={handleStartNewMatch} className="w-64 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg text-xl">Start New Match</button> <button onClick={loadMatchesFromFirebase} disabled={!isAuthReady} className="w-64 bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg text-xl disabled:bg-gray-700 disabled:cursor-not-allowed">Load Match</button> <button onClick={handleGoBackToTeams} className="w-64 bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-6 rounded-lg text-lg mt-4">Back to Team Selection</button> </div> </div> )}
+
 {matchPhase === 'base_rotation_setup' && <BaseRotationSetup />}
-{matchPhase === 'post_match' && ( <div className="text-center p-8"> <h1 className="text-4xl font-bold text-cyan-400 mb-4">Match Over</h1> <Scoreboard earnedPoints={earnedPoints} /> <TabbedDisplay /> <button onClick={() => { window.location.reload(); }} className="mt-8 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg text-xl">Return to Main Menu</button> </div> )}
+
+{matchPhase === 'post_match' && ( <div className="text-center p-8"> <h1 className="text-4xl font-bold text-cyan-400 mb-4">Match Over</h1> <Scoreboard earnedPoints={earnedPoints} /> <TabbedDisplay /> <button onClick={() => { setSelectedTeamId(null); setMatchPhase('team_selection'); }} className="mt-8 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg text-xl">Return to Team Selection</button> </div> )}
+
 {matchPhase === 'lineup_setup' && <LineupSetup />}
+
 {matchPhase === 'playing' && (
 <>
 <Scoreboard earnedPoints={earnedPoints} />
@@ -1525,7 +1622,7 @@ return (
 <Modal title="Error" isOpen={modal === 'illegal-pass'} onClose={() => setModal(null)}> <p>Cannot assign a passing stat when your team is serving.</p> </Modal>
 <Modal title="Illegal Action" isOpen={modal === 'illegal-block'} onClose={() => setModal(null)}> <p>Back row players can't get a block stat - this is Illegal.</p> </Modal>
 <Modal title="Illegal Libero Serve" isOpen={modal === 'illegal-libero-serve'} onClose={() => setModal(null)}> <p>This is an illegal serve. The libero has already served for a different player in this set.</p> </Modal>
-<Modal title="Confirm End Set" isOpen={modal === 'end-set-confirm'} onClose={() => setModal(null)}> <p className="mb-4">Are you sure you want to end the current set? The scores will be recorded and you will proceed to the next set's lineup.</p> <div className="flex justify-end space-x-4"> <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button> <button onClick={handleEndSet} className="bg-red-600 hover:bg-red-500 p-2 px-4 rounded">End Set</button> </div> </Modal>
+<Modal title="Confirm End Set" isOpen={modal === 'end-set-confirm'} onClose={() => setModal(null)}> <p className="mb-4">Are you sure you want to end the current set? The scores will be recorded and you will proceed to the next set's lineup.</p> <div className="flex justify-end space-x-4"> <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button> <button onClick={handleEndSet} className="bg-red-600 hover:red-500 p-2 px-4 rounded">End Set</button> </div> </Modal>
 <Modal title="Confirm Setter Change" isOpen={modal === 'change-setter-confirm'} onClose={() => setModal(null)}> <p className="mb-4">Are you sure you want to change the designated setter mid-set? This action can be undone.</p> <div className="flex justify-end space-x-4"> <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button> <button onClick={() => setModal('select-new-setter')} className="bg-yellow-600 hover:bg-yellow-500 p-2 px-4 rounded">Change Setter</button> </div> </Modal>
 <Modal title="Confirm End Match" isOpen={modal === 'confirm-end-match'} onClose={() => setModal(null)}>
     <p className="mb-4">Are you sure you want to end the match now? The current stats will be saved.</p>
