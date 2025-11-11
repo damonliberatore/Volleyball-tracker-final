@@ -1,7 +1,7 @@
-// App.js - Final Corrected Version
+// App.js - Final Corrected Version (Multi-Team)
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, orderBy, limit, deleteDoc, addDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, collection, getDocs, query, orderBy, limit, deleteDoc, addDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 
 // --- Helper Components (Stateless) ---
@@ -260,6 +260,33 @@ leaderReceiveAttempts = currentAttempts;
 leaders.receivePct = receivePctLeader;
 return leaders;
 }, [allSetStats, viewingSet, pointLog, roster]);
+
+// --- NEW Function to reset all match state ---
+const resetMatchState = () => {
+    setGameState({ homeScore: 0, opponentScore: 0, homeSetsWon: 0, opponentSetsWon: 0, servingTeam: null, homeSubs: 0, currentSet: 1, rotation: 1 });
+    setMatchId(null);
+    setMatchName('');
+    setHomeTeamName('HOME');
+    setOpponentTeamName('OPPONENT');
+    setRoster([]);
+    setLineup({ p1: null, p2: null, p3: null, p4: null, p5: null, p6: null });
+    setBaseRotationLineup({ p1: null, p2: null, p3: null, p4: null, p5: null, p6: null });
+    setLiberos([]);
+    setLiberoServingFor(null);
+    setLiberoHasServedFor(null);
+    setCurrentServerId(null);
+    setSetterId(null);
+    setBench([]);
+    setPointLog([]);
+    setPlayerStats({});
+    setAllSetStats({});
+    setSeasonStats({});
+    setRotationScores({});
+    setHistory([]);
+    setSetupStep('rotation_select');
+    setSavedMatches([]);
+    setIsWaitingForLiberoServeChoice(false);
+};
 // App.js - Batch 2 of 3
 
 // --- Firebase Initialization & Auth ---
@@ -406,14 +433,6 @@ const calculateSeasonStats = async () => {
     }
 };
 
-const saveMatchToFirebase = async () => {
-if (autoSaveTimeoutRef.current) {
-clearTimeout(autoSaveTimeoutRef.current);
-}
-await autoSaveMatchToFirebase();
-alert("Match saved successfully!");
-};
-
 const loadMatchesFromFirebase = async () => {
 if (!getMatchCollectionRef()) return;
 try {
@@ -467,15 +486,17 @@ const handleDeleteMatch = async () => {
     }
 };
 
-// --- Team Selection Logic ---
+// --- Team Selection Logic (UPDATED) ---
 const handleSelectTeam = (teamId) => {
     setSelectedTeamId(teamId);
     setMatchPhase('pre_match');
+    resetMatchState(); // Reset state for the new team
 };
 
 const handleGoBackToTeams = () => {
     setSelectedTeamId(null);
     setMatchPhase('team_selection');
+    resetMatchState(); // Reset state when going back
 };
 
 // --- Undo and History Logic ---
@@ -659,7 +680,7 @@ setCurrentServerId(null);
 };
 updateScoresAndServe();
 };
-// App.js - Batch 3 of 3
+
 // --- Stat Logic ---
 const handleStatClick = (stat) => {
 if (isWaitingForLiberoServeChoice) {
@@ -819,7 +840,7 @@ setModal(null);
 setStatToAssign(null);
 setHitContext({ attackerId: null, originalStat: null });
 };
-
+// App.js - Batch 3 of 3
 // --- Sub Logic ---
 const handleSubClick = (position, playerOutId) => {
 if (!playerOutId) return;
@@ -1558,6 +1579,11 @@ const AssignBlockAssistModal = () => {
     );
 };
 
+const handleReturnToTeams = () => {
+    setSelectedTeamId(null);
+    setMatchPhase('team_selection');
+    resetMatchState();
+};
 
 // --- Main Render ---
 return (
@@ -1570,7 +1596,7 @@ return (
 
 {matchPhase === 'base_rotation_setup' && <BaseRotationSetup />}
 
-{matchPhase === 'post_match' && ( <div className="text-center p-8"> <h1 className="text-4xl font-bold text-cyan-400 mb-4">Match Over</h1> <Scoreboard earnedPoints={earnedPoints} /> <TabbedDisplay /> <button onClick={() => { setSelectedTeamId(null); setMatchPhase('team_selection'); }} className="mt-8 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg text-xl">Return to Team Selection</button> </div> )}
+{matchPhase === 'post_match' && ( <div className="text-center p-8"> <h1 className="text-4xl font-bold text-cyan-400 mb-4">Match Over</h1> <Scoreboard earnedPoints={earnedPoints} /> <TabbedDisplay /> <button onClick={handleReturnToTeams} className="mt-8 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg text-xl">Return to Team Selection</button> </div> )}
 
 {matchPhase === 'lineup_setup' && <LineupSetup />}
 
@@ -1614,15 +1640,18 @@ return (
 <Modal title="Select New Setter" isOpen={modal === 'select-new-setter'} onClose={() => setModal(null)}><SelectNewSetterModal /></Modal>
 <Modal title="Set Libero to Serve For" isOpen={modal === 'set-libero-serve'} onClose={() => setModal(null)}><SetLiberoServeModal /></Modal>
 <Modal title="Assign Block Assist" isOpen={modal === 'assign-block-assist'} onClose={() => setModal(null)}><AssignBlockAssistModal /></Modal>
-<Modal title="Is the Libero Serving?" isOpen={modal === 'confirm-libero-serve'} onClose={() => {}}>
+
+{/* --- THIS IS THE FIXED MODAL --- */}
+<Modal title="Is the Libero Serving?" isOpen={modal === 'confirm-libero-serve'} onClose={() => setIsWaitingForLiberoServeChoice(false)}>
 <p className="mb-4">The designated player is in the serving position. Should the libero serve for them?</p>
 <div className="flex justify-around"> <button onClick={() => handleLiberoServeChoice(true)} className="bg-green-600 hover:bg-green-500 p-3 rounded-lg w-32 font-bold">Yes</button> <button onClick={() => handleLiberoServeChoice(false)} className="bg-red-600 hover:bg-red-500 p-3 rounded-lg w-32 font-bold">No</button> </div>
 </Modal>
+
 <Modal title="Error" isOpen={modal === 'not-serving-error'} onClose={() => setModal(null)}> <p>Cannot assign a serving stat when your team is not serving.</p> </Modal>
 <Modal title="Error" isOpen={modal === 'illegal-pass'} onClose={() => setModal(null)}> <p>Cannot assign a passing stat when your team is serving.</p> </Modal>
 <Modal title="Illegal Action" isOpen={modal === 'illegal-block'} onClose={() => setModal(null)}> <p>Back row players can't get a block stat - this is Illegal.</p> </Modal>
 <Modal title="Illegal Libero Serve" isOpen={modal === 'illegal-libero-serve'} onClose={() => setModal(null)}> <p>This is an illegal serve. The libero has already served for a different player in this set.</p> </Modal>
-<Modal title="Confirm End Set" isOpen={modal === 'end-set-confirm'} onClose={() => setModal(null)}> <p className="mb-4">Are you sure you want to end the current set? The scores will be recorded and you will proceed to the next set's lineup.</p> <div className="flex justify-end space-x-4"> <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button> <button onClick={handleEndSet} className="bg-red-600 hover:red-500 p-2 px-4 rounded">End Set</button> </div> </Modal>
+<Modal title="Confirm End Set" isOpen={modal === 'end-set-confirm'} onClose={() => setModal(null)}> <p className="mb-4">Are you sure you want to end the current set? The scores will be recorded and you will proceed to the next set's lineup.</p> <div className="flex justify-end space-x-4"> <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button> <button onClick={handleEndSet} className="bg-red-600 hover:bg-red-500 p-2 px-4 rounded">End Set</button> </div> </Modal>
 <Modal title="Confirm Setter Change" isOpen={modal === 'change-setter-confirm'} onClose={() => setModal(null)}> <p className="mb-4">Are you sure you want to change the designated setter mid-set? This action can be undone.</p> <div className="flex justify-end space-x-4"> <button onClick={() => setModal(null)} className="bg-gray-600 hover:bg-gray-500 p-2 px-4 rounded">Cancel</button> <button onClick={() => setModal('select-new-setter')} className="bg-yellow-600 hover:bg-yellow-500 p-2 px-4 rounded">Change Setter</button> </div> </Modal>
 <Modal title="Confirm End Match" isOpen={modal === 'confirm-end-match'} onClose={() => setModal(null)}>
     <p className="mb-4">Are you sure you want to end the match now? The current stats will be saved.</p>
